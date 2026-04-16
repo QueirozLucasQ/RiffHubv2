@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import AudioPlayer from '@/components/AudioPlayer'
 import type { Project, ProjectTrack, ProjectDiscussion } from '@/lib/types'
 
 interface ProjectDetailProps {
