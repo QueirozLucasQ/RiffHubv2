@@ -2,125 +2,70 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import MusicianCard from '@/components/MusicianCard'
+import Link from 'next/link'
+import LevelBadge from '@/components/LevelBadge'
 import type { Profile } from '@/lib/types'
+
+const INSTRUMENTS = ['Guitarra', 'Baixo', 'Bateria', 'Teclado', 'Violão', 'Voz', 'Saxofone']
 
 export default function SearchPage() {
   const [musicians, setMusicians] = useState<Profile[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [searchName, setSearchName] = useState('')
   const [searchCity, setSearchCity] = useState('')
-  const [instrumentFilter, setInstrumentFilter] = useState<string>('')
+  const [instrumentFilter, setInstrumentFilter] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
-    const searchMusicians = async () => {
-      try {
-        setLoading(true)
-        let query = supabase
-          .from('profiles')
-          .select('*')
-          .order('points', { ascending: false })
-
-        if (searchName) {
-          query = query.ilike('name', `%${searchName}%`)
-        }
-
-        if (searchCity) {
-          query = query.ilike('city', `%${searchCity}%`)
-        }
-
-        if (instrumentFilter) {
-          query = query.contains('instruments', [instrumentFilter])
-        }
-
-        const { data, error } = await query
-
-        if (error) throw error
-
-        setMusicians(data || [])
-      } catch (error) {
-        console.error('Error searching musicians:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    // Debounce search
-    const timer = setTimeout(() => {
-      searchMusicians()
-    }, 300)
-
+    const timer = setTimeout(() => searchMusicians(), 300)
     return () => clearTimeout(timer)
   }, [searchName, searchCity, instrumentFilter])
 
-  const instruments = [
-    'Guitarra',
-    'Baixo',
-    'Bateria',
-    'Teclado',
-    'Violão',
-    'Voz',
-    'Saxofone',
-  ]
+  const searchMusicians = async () => {
+    try {
+      setLoading(true)
+      let query = supabase.from('profiles').select('*').order('points', { ascending: false })
+      if (searchName) query = query.ilike('name', `%${searchName}%`)
+      if (searchCity) query = query.ilike('city', `%${searchCity}%`)
+      if (instrumentFilter) query = query.contains('instruments', [instrumentFilter])
+      const { data, error } = await query
+      if (error) throw error
+      setMusicians(data || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-black">
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold mb-12">Encontre Músicos</h1>
+      <div className="max-w-6xl mx-auto px-4 py-10">
+        <h1 className="text-4xl font-bold mb-2">Encontrar Músicos</h1>
+        <p className="text-muted mb-8">Conecte-se com músicos do Brasil inteiro</p>
 
-        {/* Search & Filters */}
-        <div className="mb-12 space-y-6">
-          {/* Name Search */}
-          <div>
-            <label className="block text-sm font-semibold mb-3">Nome do Músico</label>
-            <input
-              type="text"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              placeholder="Procure por nome..."
-              className="w-full px-4 py-3 bg-card border border-border rounded text-white placeholder-muted outline-none focus:border-blue transition"
-            />
+        {/* Filters */}
+        <div className="card mb-8">
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-xs text-muted font-medium mb-2">NOME</label>
+              <input type="text" value={searchName} onChange={e => setSearchName(e.target.value)}
+                placeholder="Buscar por nome..." className="input" />
+            </div>
+            <div>
+              <label className="block text-xs text-muted font-medium mb-2">CIDADE</label>
+              <input type="text" value={searchCity} onChange={e => setSearchCity(e.target.value)}
+                placeholder="São Paulo, Rio..." className="input" />
+            </div>
           </div>
-
-          {/* City Search */}
           <div>
-            <label className="block text-sm font-semibold mb-3">Cidade</label>
-            <input
-              type="text"
-              value={searchCity}
-              onChange={(e) => setSearchCity(e.target.value)}
-              placeholder="Digite a cidade..."
-              className="w-full px-4 py-3 bg-card border border-border rounded text-white placeholder-muted outline-none focus:border-blue transition"
-            />
-          </div>
-
-          {/* Instrument Quick Filter */}
-          <div>
-            <label className="block text-sm font-semibold mb-3">Instrumentos</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <button
-                onClick={() => setInstrumentFilter('')}
-                className={`px-4 py-2 rounded text-sm font-semibold transition ${
-                  instrumentFilter === ''
-                    ? 'bg-red text-white'
-                    : 'bg-card border border-border hover:border-blue'
-                }`}
-              >
-                Todos
-              </button>
-              {instruments.map((inst) => (
-                <button
-                  key={inst}
-                  onClick={() => setInstrumentFilter(inst)}
-                  className={`px-4 py-2 rounded text-sm font-semibold transition ${
-                    instrumentFilter === inst
-                      ? 'bg-red text-white'
-                      : 'bg-card border border-border hover:border-blue'
-                  }`}
-                >
-                  {inst}
-                </button>
+            <label className="block text-xs text-muted font-medium mb-2">INSTRUMENTO</label>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setInstrumentFilter('')}
+                className={`chip ${instrumentFilter === '' ? 'chip-active-red' : ''}`}>Todos</button>
+              {INSTRUMENTS.map(inst => (
+                <button key={inst} onClick={() => setInstrumentFilter(inst)}
+                  className={`chip ${instrumentFilter === inst ? 'chip-active-red' : ''}`}>{inst}</button>
               ))}
             </div>
           </div>
@@ -128,23 +73,56 @@ export default function SearchPage() {
 
         {/* Results */}
         {loading ? (
-          <div className="text-center py-12 text-muted">
-            <p>Procurando músicos...</p>
-          </div>
+          <div className="empty-state"><div className="animate-pulse text-muted">Procurando músicos...</div></div>
         ) : musicians.length > 0 ? (
-          <div>
-            <p className="text-muted mb-6">
+          <>
+            <p className="text-sm text-muted mb-5">
               {musicians.length} músico{musicians.length !== 1 ? 's' : ''} encontrado{musicians.length !== 1 ? 's' : ''}
             </p>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {musicians.map((musician) => (
-                <MusicianCard key={musician.id} musician={musician} />
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {musicians.map(musician => (
+                <Link key={musician.id} href={`/profile/${musician.id}`} className="card card-hover block">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
+                      style={{ backgroundColor: musician.avatar_color }}>
+                      {musician.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold truncate">{musician.name}</p>
+                      {musician.city && <p className="text-sm text-muted">📍 {musician.city}</p>}
+                    </div>
+                    <LevelBadge points={musician.points} size="sm" />
+                  </div>
+
+                  {musician.bio && (
+                    <p className="text-sm text-muted mb-3 line-clamp-2">{musician.bio}</p>
+                  )}
+
+                  {musician.instruments?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {musician.instruments.slice(0, 3).map((inst: string) => (
+                        <span key={inst} className="badge badge-blue text-xs">{inst}</span>
+                      ))}
+                      {musician.instruments.length > 3 && (
+                        <span className="text-xs text-muted">+{musician.instruments.length - 3}</span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted"
+                    style={{ borderColor: 'var(--border)' }}>
+                    <span>{musician.points} pts</span>
+                    <span className="text-blue">Ver perfil →</span>
+                  </div>
+                </Link>
               ))}
             </div>
-          </div>
+          </>
         ) : (
-          <div className="text-center py-12 text-muted">
-            <p>Nenhum músico encontrado. Tente ajustar sua busca.</p>
+          <div className="empty-state">
+            <div className="empty-state-icon">🔍</div>
+            <p className="text-lg font-semibold mb-1">Nenhum músico encontrado</p>
+            <p className="text-sm">Tente ajustar os filtros de busca</p>
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getOrCreateProfile } from '@/lib/getOrCreateProfile'
 import type { Project, ProjectTrack, ProjectDiscussion } from '@/lib/types'
 
 interface ProjectDetailProps {
@@ -14,6 +15,9 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
   const [discussions, setDiscussions] = useState<ProjectDiscussion[]>([])
   const [loading, setLoading] = useState(true)
   const [messageText, setMessageText] = useState('')
+  const [proposing, setProposing] = useState(false)
+  const [proposeInstrument, setProposeInstrument] = useState('')
+  const [proposeError, setProposeError] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -61,21 +65,20 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
     if (!messageText.trim() || !project) return
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const profile = await getOrCreateProfile()
+      if (!profile) return
 
-      if (!user) return
-
-      const { data: newDiscussion } = await supabase
+      const { data: newDiscussion, error } = await supabase
         .from('project_discussions')
         .insert({
           project_id: project.id,
-          user_id: user.id,
+          user_id: profile.id,
           text: messageText,
         })
         .select('*, user:profiles(*)')
         .single()
+
+      if (error) throw error
 
       if (newDiscussion) {
         setDiscussions([newDiscussion, ...discussions])
@@ -83,6 +86,39 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
       }
     } catch (error) {
       console.error('Error sending message:', error)
+    }
+  }
+
+  const handleProposeInstrument = async () => {
+    if (!proposeInstrument.trim() || !project) return
+    setProposing(true)
+    setProposeError('')
+    try {
+      const profile = await getOrCreateProfile()
+      if (!profile) { setProposeError('Faça login primeiro'); setProposing(false); return }
+
+      const { error } = await supabase
+        .from('project_tracks')
+        .insert({
+          project_id: project.id,
+          instrument: proposeInstrument,
+          musician_id: profile.id,
+          filled: false,
+        })
+
+      if (error) throw error
+
+      // Refresh tracks
+      const { data: tracksData } = await supabase
+        .from('project_tracks')
+        .select('*, musician:profiles(*)')
+        .eq('project_id', project.id)
+      if (tracksData) setTracks(tracksData)
+      setProposeInstrument('')
+    } catch (err: any) {
+      setProposeError(err?.message || 'Erro ao propor instrumento')
+    } finally {
+      setProposing(false)
     }
   }
 
@@ -219,8 +255,22 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
             {/* Propose Track */}
             <div className="card">
               <h3 className="font-bold mb-4">Contribuir</h3>
-              <button className="w-full btn btn-primary btn-sm">
-                Propor Instrumento
+              <p className="text-sm text-muted mb-3">Qual instrumento você toca?</p>
+              <input
+                type="text"
+                value={proposeInstrument}
+                onChange={(e) => setProposeInstrument(e.target.value)}
+                placeholder="Ex: Guitarra, Baixo..."
+                className="w-full px-3 py-2 bg-dark border border-border rounded text-white text-sm outline-none focus:border-blue mb-3"
+                onKeyDown={(e) => e.key === 'Enter' && handleProposeInstrument()}
+              />
+              {proposeError && <p className="text-red-400 text-xs mb-2">{proposeError}</p>}
+              <button
+                onClick={handleProposeInstrument}
+                disabled={proposing || !proposeInstrument.trim()}
+                className="w-full btn btn-primary btn-sm"
+              >
+                {proposing ? 'Enviando...' : 'Propor Instrumento'}
               </button>
             </div>
 

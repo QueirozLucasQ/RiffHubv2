@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
@@ -12,6 +12,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const supabase = createClient()
 
@@ -37,6 +38,16 @@ export default function Navbar() {
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -89,7 +100,7 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {!loading && (
             user && profile ? (
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-card"
@@ -110,7 +121,6 @@ export default function Navbar() {
 
                 {menuOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
                     <div className="absolute right-0 top-11 rounded-xl shadow-2xl z-50 py-1 min-w-[180px] animate-fade-in"
                       style={{ background: 'var(--card)', border: '1px solid var(--border-light)' }}>
                       <div className="px-4 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
@@ -132,7 +142,6 @@ export default function Navbar() {
                         🚪 Sair
                       </button>
                     </div>
-                  </>
                 )}
               </div>
             ) : (
