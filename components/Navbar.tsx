@@ -88,21 +88,31 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {!loading && (user && profile ? (
             <>
-              <Link href={`/profile/${profile.id}`} className="flex items-center gap-2 hover:opacity-80 transition">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ backgroundColor: profile.avatar_color }}
-                >
-                  {profile.name.charAt(0).toUpperCase()}
+              <div className="relative group">
+                <button className="flex items-center gap-2 hover:opacity-80 transition">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                    style={{ backgroundColor: profile.avatar_color }}
+                  >
+                    {profile.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm hidden md:inline">{profile.name}</span>
+                </button>
+                <div className="absolute right-0 top-10 bg-card border border-border rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-50 min-w-[160px]">
+                  <Link href={`/profile/${profile.id}`} className="block px-4 py-2 text-sm hover:bg-dark transition">
+                    Ver Perfil
+                  </Link>
+                  <Link href="/profile/edit" className="block px-4 py-2 text-sm hover:bg-dark transition">
+                    Editar Perfil
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="block w-full text-left px-4 py-2 text-sm text-red hover:bg-dark transition"
+                  >
+                    Sair
+                  </button>
                 </div>
-                <span className="text-sm hidden md:inline">{profile.name}</span>
-              </Link>
-              <button
-                onClick={handleSignOut}
-                className="btn btn-sm btn-secondary"
-              >
-                Sair
-              </button>
+              </div>
             </>
           ) : (
             <button
