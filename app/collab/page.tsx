@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getOrCreateProfile } from '@/lib/getOrCreateProfile'
 import ProjectCard from '@/components/ProjectCard'
 import type { Project } from '@/lib/types'
 
@@ -14,6 +15,7 @@ export default function CollabPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'completed'>('all')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -53,12 +55,10 @@ export default function CollabPage() {
   const handleCreateProject = async () => {
     if (!form.title || !form.style || !form.bpm) return
     setSaving(true)
+    setError('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { alert('Faça login primeiro'); setSaving(false); return }
-
-      const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single()
-      if (!profile) { setSaving(false); return }
+      const profile = await getOrCreateProfile()
+      if (!profile) { setError('Faça login para criar um projeto'); setSaving(false); return }
 
       const { data: project, error } = await supabase
         .from('projects')
@@ -87,8 +87,9 @@ export default function CollabPage() {
       setShowModal(false)
       setForm({ title: '', description: '', style: '', bpm: '', key: 'C', instruments: [''] })
       fetchProjects()
-    } catch (error) {
-      console.error('Error creating project:', error)
+    } catch (err: any) {
+      console.error('Error creating project:', err)
+      setError(err?.message || 'Erro ao criar projeto. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -258,7 +259,8 @@ export default function CollabPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            {error && <p className="text-red-400 text-sm bg-red-900/20 border border-red-800/30 rounded p-3">{error}</p>}
+            <div className="flex gap-3 mt-4">
               <button onClick={handleCreateProject} disabled={saving || !form.title || !form.style || !form.bpm} className="btn btn-primary flex-1">
                 {saving ? 'Criando...' : 'Criar Projeto'}
               </button>

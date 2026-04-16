@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getOrCreateProfile } from '@/lib/getOrCreateProfile'
 import GigCard from '@/components/GigCard'
 import type { Gig } from '@/lib/types'
 
@@ -13,6 +14,7 @@ export default function GigsPage() {
   const [locationFilter, setLocationFilter] = useState<'all' | 'remote' | 'onsite'>('all')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     title: '',
     instrument: '',
@@ -48,12 +50,10 @@ export default function GigsPage() {
   const handleCreateGig = async () => {
     if (!form.title || !form.instrument || !form.type || !form.dates || !form.city || !form.pay) return
     setSaving(true)
+    setError('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { alert('Faça login primeiro'); setSaving(false); return }
-
-      const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single()
-      if (!profile) { setSaving(false); return }
+      const profile = await getOrCreateProfile()
+      if (!profile) { setError('Faça login para postar uma gig'); setSaving(false); return }
 
       await supabase.from('gigs').insert({
         title: form.title,
@@ -71,8 +71,9 @@ export default function GigsPage() {
       setShowModal(false)
       setForm({ title: '', instrument: '', type: '', dates: '', city: '', remote: false, pay: '', description: '' })
       fetchGigs()
-    } catch (error) {
-      console.error('Error creating gig:', error)
+    } catch (err: any) {
+      console.error('Error creating gig:', err)
+      setError(err?.message || 'Erro ao criar gig. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -214,7 +215,8 @@ export default function GigsPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            {error && <p className="text-red-400 text-sm bg-red-900/20 border border-red-800/30 rounded p-3">{error}</p>}
+            <div className="flex gap-3 mt-4">
               <button onClick={handleCreateGig} disabled={saving || !form.title || !form.instrument || !form.type || !form.dates || !form.city || !form.pay} className="btn btn-primary flex-1">
                 {saving ? 'Postando...' : 'Postar Gig'}
               </button>

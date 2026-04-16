@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getOrCreateProfile } from '@/lib/getOrCreateProfile'
 import SampleCard from '@/components/SampleCard'
 import type { Sample, Profile } from '@/lib/types'
 
@@ -15,6 +16,7 @@ export default function RiffStorePage() {
   const [licenseFilter, setLicenseFilter] = useState<string>('')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [form, setForm] = useState({
     title: '',
@@ -57,12 +59,10 @@ export default function RiffStorePage() {
   const handleCreateSample = async () => {
     if (!form.title || !form.category || !form.bpm || !audioFile) return
     setSaving(true)
+    setError('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { alert('Faça login primeiro'); setSaving(false); return }
-
-      const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single()
-      if (!profile) { setSaving(false); return }
+      const profile = await getOrCreateProfile()
+      if (!profile) { setError('Faça login para subir um sample'); setSaving(false); return }
 
       // Upload audio file
       const fileExt = audioFile.name.split('.').pop()
@@ -92,9 +92,9 @@ export default function RiffStorePage() {
       setAudioFile(null)
       fetchSamples()
       fetchTopCreators()
-    } catch (error) {
-      console.error('Error creating sample:', error)
-      alert('Erro ao subir sample. Verifique se o bucket de audio está configurado.')
+    } catch (err: any) {
+      console.error('Error creating sample:', err)
+      setError(err?.message || 'Erro ao subir sample. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -242,7 +242,8 @@ export default function RiffStorePage() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            {error && <p className="text-red-400 text-sm bg-red-900/20 border border-red-800/30 rounded p-3 mt-2">{error}</p>}
+            <div className="flex gap-3 mt-4">
               <button onClick={handleCreateSample} disabled={saving || !form.title || !form.category || !form.bpm || !audioFile} className="btn btn-primary flex-1">
                 {saving ? 'Enviando...' : 'Subir Sample'}
               </button>
