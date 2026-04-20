@@ -99,7 +99,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
   white-space: nowrap;
 }
 
-.btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
