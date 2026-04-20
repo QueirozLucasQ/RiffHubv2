@@ -21,28 +21,45 @@ const licenseColors: Record<string, string> = {
 export default function SampleCard({ sample }: SampleCardProps) {
   const [downloading, setDownloading] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
   const supabase = createClient()
 
   const handleDownload = async () => {
     setDownloading(true)
+    setDownloadError('')
     try {
       // Increment downloads count
       await supabase.from('samples').update({ downloads: (sample.downloads || 0) + 1 }).eq('id', sample.id)
 
-      // Trigger browser download
-      const response = await fetch(sample.audio_url)
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${sample.title}.${sample.audio_url.split('.').pop()?.split('?')[0] || 'mp3'}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      // Extract the storage file path from the public URL
+      // URL format: https://[ref].supabase.co/storage/v1/object/public/audio/[path]
+      const audioUrl = sample.audio_url
+      const storagePathMatch = audioUrl.match(/\/object\/public\/audio\/(.+)/)
+
+      if (storagePathMatch) {
+        // Use Supabase storage client — avoids CORS issues
+        const filePath = storagePathMatch[1].split('?')[0]
+        const { data, error } = await supabase.storage.from('audio').download(filePath)
+        if (error) throw error
+
+        const ext = filePath.split('.').pop() || 'mp3'
+        const url = URL.createObjectURL(data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${sample.title}.${ext}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else {
+        // Fallback: open in new tab
+        window.open(audioUrl, '_blank')
+      }
+
       setDownloaded(true)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Download error:', err)
+      setDownloadError('Erro ao baixar. Tente novamente.')
     } finally {
       setDownloading(false)
     }
@@ -97,6 +114,7 @@ export default function SampleCard({ sample }: SampleCardProps) {
       </div>
 
       {/* Download */}
+      {downloadError && <p className="text-xs text-red-400 mb-2">{downloadError}</p>}
       <button onClick={handleDownload} disabled={downloading}
         className={`w-full btn btn-sm ${downloaded ? 'btn-secondary' : 'btn-ghost'}`}>
         {downloading ? 'Baixando...' : downloaded ? '✓ Baixado' : '⬇ Baixar'}
