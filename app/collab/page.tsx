@@ -35,7 +35,7 @@ export default function CollabPage() {
       setLoading(true)
       let query = supabase
         .from('projects')
-        .select('*, owner:profiles(*), project_tracks(*)')
+        .select('*, owner:profiles(*), tracks:project_tracks(*)')
         .order('created_at', { ascending: false })
 
       if (statusFilter !== 'all') {

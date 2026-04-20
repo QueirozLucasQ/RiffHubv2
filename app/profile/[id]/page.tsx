@@ -42,7 +42,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
 
         const [{ data: riffsData }, { data: projectsData }, { data: gigsData }] = await Promise.all([
           supabase.from('riffs').select('*, riff_likes(id)').eq('user_id', profileData.id).order('created_at', { ascending: false }),
-          supabase.from('projects').select('*, project_tracks(*)').eq('owner_id', profileData.id).order('created_at', { ascending: false }),
+          supabase.from('projects').select('*, tracks:project_tracks(*)').eq('owner_id', profileData.id).order('created_at', { ascending: false }),
           supabase.from('gigs').select('*').eq('poster_id', profileData.id).order('created_at', { ascending: false }),
         ])
 
@@ -202,7 +202,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                       <span>Tom {proj.key}</span>
                     </div>
                     <div className="text-xs text-muted">
-                      {proj.project_tracks?.filter((t: any) => t.filled).length}/{proj.project_tracks?.length || 0} instrumentos
+                      {proj.tracks?.filter((t: any) => t.filled).length || 0}/{proj.tracks?.length || 0} instrumentos
                     </div>
                   </Link>
                 ))}

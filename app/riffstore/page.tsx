@@ -85,7 +85,7 @@ export default function RiffStorePage() {
       })
 
       // Add points to creator
-      await supabase.from('profiles').update({ points: (await supabase.from('profiles').select('points').eq('id', profile.id).single()).data?.points + 10 }).eq('id', profile.id)
+      await supabase.from('profiles').update({ points: (profile.points || 0) + 10 }).eq('id', profile.id)
 
       setShowModal(false)
       setForm({ title: '', category: '', bpm: '', key: 'C', license: 'free', tags: '' })

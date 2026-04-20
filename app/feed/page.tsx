@@ -28,7 +28,7 @@ export default function FeedPage() {
       setLoading(true)
       let query = supabase
         .from('riffs')
-        .select('*, user:profiles(*), riff_likes(id)')
+        .select('*, user:profiles(*), riff_likes(id, user_id)')
         .order('created_at', { ascending: false })
       if (tagFilter) query = query.filter('tags', 'cs', `["${tagFilter}"]`)
       const { data, error } = await query
