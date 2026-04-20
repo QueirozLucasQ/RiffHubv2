@@ -254,24 +254,37 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
           <div className="space-y-8">
             {/* Propose Track */}
             <div className="card">
-              <h3 className="font-bold mb-4">Contribuir</h3>
-              <p className="text-sm text-muted mb-3">Qual instrumento você toca?</p>
+              <h3 className="font-bold mb-2">Contribuir</h3>
+              <p className="text-sm text-muted mb-4">Digite seu instrumento e clique em propor:</p>
               <input
                 type="text"
                 value={proposeInstrument}
                 onChange={(e) => setProposeInstrument(e.target.value)}
-                placeholder="Ex: Guitarra, Baixo..."
-                className="w-full px-3 py-2 bg-dark border border-border rounded text-white text-sm outline-none focus:border-blue mb-3"
+                placeholder="Ex: Guitarra, Baixo, Voz..."
+                className="w-full px-3 py-3 bg-dark border-2 rounded text-white text-sm outline-none mb-3 transition-all"
+                style={{ borderColor: proposeInstrument.trim() ? 'var(--blue)' : 'var(--border)' }}
                 onKeyDown={(e) => e.key === 'Enter' && handleProposeInstrument()}
+                autoComplete="off"
               />
-              {proposeError && <p className="text-red-400 text-xs mb-2">{proposeError}</p>}
+              {proposeError && (
+                <p className="text-xs mb-2 px-2 py-1.5 rounded bg-red-900/20 border border-red-800/30" style={{ color: '#f87171' }}>
+                  ⚠ {proposeError}
+                </p>
+              )}
               <button
                 onClick={handleProposeInstrument}
                 disabled={proposing || !proposeInstrument.trim()}
                 className="w-full btn btn-primary btn-sm"
+                style={{
+                  opacity: (!proposeInstrument.trim() || proposing) ? 0.4 : 1,
+                  cursor: !proposeInstrument.trim() ? 'not-allowed' : 'pointer',
+                }}
               >
                 {proposing ? 'Enviando...' : 'Propor Instrumento'}
               </button>
+              {!proposeInstrument.trim() && (
+                <p className="text-xs text-muted text-center mt-2">↑ Preencha o campo acima primeiro</p>
+              )}
             </div>
 
             {/* Músicos Envolvidos */}
