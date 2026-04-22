@@ -9,6 +9,8 @@ import type { Gig } from '@/lib/types'
 
 interface GigCardProps {
   gig: Gig & { poster?: any }
+  isApplied?: boolean
+  onApplied?: () => void
 }
 
 const typeLabels: Record<string, string> = {
@@ -18,14 +20,15 @@ const typeColors: Record<string, string> = {
   show: '#E53935', gravação: '#1E88E5', turnê: '#7B1FA2', sessão: '#43A047',
 }
 
-export default function GigCard({ gig }: GigCardProps) {
+export default function GigCard({ gig, isApplied = false, onApplied }: GigCardProps) {
   const [applying, setApplying] = useState(false)
-  const [applied, setApplied] = useState(false)
+  const [applied, setApplied] = useState(isApplied)
   const [error, setError] = useState('')
   const supabase = createClient()
 
   const handleApply = async (e: React.MouseEvent) => {
     e.preventDefault()
+    if (applied) return
     setApplying(true)
     setError('')
     try {
@@ -40,12 +43,14 @@ export default function GigCard({ gig }: GigCardProps) {
 
       if (err) {
         if (err.code === '23505') {
-          setError('Você já se candidatou a esta gig')
+          setApplied(true)
+          onApplied?.()
         } else {
           throw err
         }
       } else {
         setApplied(true)
+        onApplied?.()
       }
     } catch (err: any) {
       setError(err?.message || 'Erro ao candidatar')
@@ -56,6 +61,14 @@ export default function GigCard({ gig }: GigCardProps) {
 
   return (
     <div className="card card-hover" style={{ transition: 'all 0.2s ease' }}>
+      {/* Applied badge */}
+      {applied && (
+        <div className="flex items-center gap-1.5 text-xs font-semibold mb-3 px-2 py-1 rounded-full w-fit"
+          style={{ background: 'rgba(30,136,229,0.15)', color: 'var(--blue)', border: '1px solid rgba(30,136,229,0.3)' }}>
+          ✓ Candidatura enviada
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0 pr-2">

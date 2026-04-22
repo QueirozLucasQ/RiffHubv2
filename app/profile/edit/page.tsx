@@ -26,21 +26,18 @@ export default function EditProfilePage() {
     experience: 'iniciante',
     instruments: [] as string[],
     genres: [] as string[],
+    youtube_url: '',
+    instagram_url: '',
+    tiktok_url: '',
+    kwai_url: '',
   })
 
   useEffect(() => {
     const loadProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/')
-        return
-      }
+      if (!user) { router.push('/'); return }
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      const { data } = await supabase.from('profiles').select('*').eq('user_id', user.id).single()
 
       if (data) {
         setProfileId(data.id)
@@ -51,6 +48,10 @@ export default function EditProfilePage() {
           experience: data.experience || 'iniciante',
           instruments: data.instruments || [],
           genres: data.genres || [],
+          youtube_url: data.youtube_url || '',
+          instagram_url: data.instagram_url || '',
+          tiktok_url: data.tiktok_url || '',
+          kwai_url: data.kwai_url || '',
         })
       }
       setLoading(false)
@@ -59,9 +60,7 @@ export default function EditProfilePage() {
   }, [])
 
   const toggleItem = (list: string[], item: string, field: 'instruments' | 'genres') => {
-    const updated = list.includes(item)
-      ? list.filter((i) => i !== item)
-      : [...list, item]
+    const updated = list.includes(item) ? list.filter((i) => i !== item) : [...list, item]
     setForm({ ...form, [field]: updated })
   }
 
@@ -72,18 +71,19 @@ export default function EditProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      await supabase
-        .from('profiles')
-        .update({
-          name: form.name,
-          bio: form.bio,
-          city: form.city,
-          experience: form.experience,
-          instruments: form.instruments,
-          genres: form.genres,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id)
+      await supabase.from('profiles').update({
+        name: form.name,
+        bio: form.bio,
+        city: form.city,
+        experience: form.experience,
+        instruments: form.instruments,
+        genres: form.genres,
+        youtube_url: form.youtube_url || null,
+        instagram_url: form.instagram_url || null,
+        tiktok_url: form.tiktok_url || null,
+        kwai_url: form.kwai_url || null,
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', user.id)
 
       router.push(`/profile/${profileId}`)
     } catch (error) {
@@ -93,13 +93,11 @@ export default function EditProfilePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-muted">Carregando...</p>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <p className="text-muted">Carregando...</p>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-black">
@@ -110,37 +108,25 @@ export default function EditProfilePage() {
           {/* Nome */}
           <div className="card">
             <label className="block text-sm text-muted mb-2">Nome *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full px-4 py-2 bg-dark border border-border rounded text-white outline-none focus:border-blue transition"
-              placeholder="Seu nome artístico"
-            />
+              placeholder="Seu nome artístico" />
           </div>
 
           {/* Bio */}
           <div className="card">
             <label className="block text-sm text-muted mb-2">Bio</label>
-            <textarea
-              value={form.bio}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              rows={3}
+            <textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3}
               className="w-full px-4 py-2 bg-dark border border-border rounded text-white outline-none focus:border-blue transition resize-none"
-              placeholder="Fale um pouco sobre você..."
-            />
+              placeholder="Fale um pouco sobre você..." />
           </div>
 
           {/* Cidade */}
           <div className="card">
             <label className="block text-sm text-muted mb-2">Cidade</label>
-            <input
-              type="text"
-              value={form.city}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
+            <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
               className="w-full px-4 py-2 bg-dark border border-border rounded text-white outline-none focus:border-blue transition"
-              placeholder="Ex: São Paulo, SP"
-            />
+              placeholder="Ex: São Paulo, SP" />
           </div>
 
           {/* Experiência */}
@@ -148,15 +134,8 @@ export default function EditProfilePage() {
             <label className="block text-sm text-muted mb-3">Nível de Experiência</label>
             <div className="flex flex-wrap gap-2">
               {EXPERIENCE_LEVELS.map((level) => (
-                <button
-                  key={level.value}
-                  onClick={() => setForm({ ...form, experience: level.value })}
-                  className={`px-4 py-2 rounded text-sm font-semibold transition ${
-                    form.experience === level.value
-                      ? 'bg-blue text-white'
-                      : 'bg-dark border border-border text-muted hover:border-blue'
-                  }`}
-                >
+                <button key={level.value} onClick={() => setForm({ ...form, experience: level.value })}
+                  className={`px-4 py-2 rounded text-sm font-semibold transition ${form.experience === level.value ? 'bg-blue text-white' : 'bg-dark border border-border text-muted hover:border-blue'}`}>
                   {level.label}
                 </button>
               ))}
@@ -168,15 +147,8 @@ export default function EditProfilePage() {
             <label className="block text-sm text-muted mb-3">Instrumentos</label>
             <div className="flex flex-wrap gap-2">
               {INSTRUMENTS.map((inst) => (
-                <button
-                  key={inst}
-                  onClick={() => toggleItem(form.instruments, inst, 'instruments')}
-                  className={`px-3 py-1 rounded text-sm transition ${
-                    form.instruments.includes(inst)
-                      ? 'bg-red text-white'
-                      : 'bg-dark border border-border text-muted hover:border-red'
-                  }`}
-                >
+                <button key={inst} onClick={() => toggleItem(form.instruments, inst, 'instruments')}
+                  className={`px-3 py-1 rounded text-sm transition ${form.instruments.includes(inst) ? 'bg-red text-white' : 'bg-dark border border-border text-muted hover:border-red'}`}>
                   {inst}
                 </button>
               ))}
@@ -188,36 +160,63 @@ export default function EditProfilePage() {
             <label className="block text-sm text-muted mb-3">Gêneros Musicais</label>
             <div className="flex flex-wrap gap-2">
               {GENRES.map((genre) => (
-                <button
-                  key={genre}
-                  onClick={() => toggleItem(form.genres, genre, 'genres')}
-                  className={`px-3 py-1 rounded text-sm transition ${
-                    form.genres.includes(genre)
-                      ? 'bg-blue text-white'
-                      : 'bg-dark border border-border text-muted hover:border-blue'
-                  }`}
-                >
+                <button key={genre} onClick={() => toggleItem(form.genres, genre, 'genres')}
+                  className={`px-3 py-1 rounded text-sm transition ${form.genres.includes(genre) ? 'bg-blue text-white' : 'bg-dark border border-border text-muted hover:border-blue'}`}>
                   {genre}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Redes Sociais */}
+          <div className="card">
+            <label className="block text-sm font-semibold mb-4">Redes Sociais</label>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xl w-8 text-center">📺</span>
+                <div className="flex-1">
+                  <label className="block text-xs text-muted mb-1">YouTube</label>
+                  <input type="url" value={form.youtube_url} onChange={e => setForm({ ...form, youtube_url: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark border border-border rounded text-white text-sm outline-none focus:border-red transition"
+                    placeholder="https://youtube.com/@seu-canal" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xl w-8 text-center">📸</span>
+                <div className="flex-1">
+                  <label className="block text-xs text-muted mb-1">Instagram</label>
+                  <input type="url" value={form.instagram_url} onChange={e => setForm({ ...form, instagram_url: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark border border-border rounded text-white text-sm outline-none focus:border-red transition"
+                    placeholder="https://instagram.com/seu-perfil" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xl w-8 text-center">🎵</span>
+                <div className="flex-1">
+                  <label className="block text-xs text-muted mb-1">TikTok</label>
+                  <input type="url" value={form.tiktok_url} onChange={e => setForm({ ...form, tiktok_url: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark border border-border rounded text-white text-sm outline-none focus:border-red transition"
+                    placeholder="https://tiktok.com/@seu-perfil" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xl w-8 text-center">🎬</span>
+                <div className="flex-1">
+                  <label className="block text-xs text-muted mb-1">Kwai</label>
+                  <input type="url" value={form.kwai_url} onChange={e => setForm({ ...form, kwai_url: e.target.value })}
+                    className="w-full px-3 py-2 bg-dark border border-border rounded text-white text-sm outline-none focus:border-red transition"
+                    placeholder="https://kwai.com/@seu-perfil" />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="flex gap-4">
-            <button
-              onClick={handleSave}
-              disabled={saving || !form.name.trim()}
-              className="btn btn-primary flex-1"
-            >
+            <button onClick={handleSave} disabled={saving || !form.name.trim()} className="btn btn-primary flex-1">
               {saving ? 'Salvando...' : 'Salvar Perfil'}
             </button>
-            <button
-              onClick={() => router.back()}
-              className="btn btn-secondary"
-            >
-              Cancelar
-            </button>
+            <button onClick={() => router.back()} className="btn btn-secondary">Cancelar</button>
           </div>
         </div>
       </div>

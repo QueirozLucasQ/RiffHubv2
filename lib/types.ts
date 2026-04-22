@@ -11,6 +11,10 @@ export interface Profile {
   points: number
   avatar_color: string
   avatar_url?: string
+  youtube_url?: string
+  instagram_url?: string
+  tiktok_url?: string
+  kwai_url?: string
   created_at: string
   updated_at: string
 }
@@ -70,6 +74,7 @@ export interface Sample {
   title: string
   creator_id: string
   category: string
+  style?: string
   bpm: number
   key: string
   license: 'free' | 'credit' | 'non-commercial'

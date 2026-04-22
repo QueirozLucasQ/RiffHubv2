@@ -115,7 +115,41 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                 </div>
               </div>
 
-              {profile.bio && <p className="text-subtle text-sm">{profile.bio}</p>}
+              {profile.bio && <p className="text-subtle text-sm mb-3">{profile.bio}</p>}
+
+              {/* Social links */}
+              {(profile.youtube_url || profile.instagram_url || profile.tiktok_url || profile.kwai_url) && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {profile.youtube_url && (
+                    <a href={profile.youtube_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80"
+                      style={{ background: 'rgba(255,0,0,0.15)', color: '#ff4444', border: '1px solid rgba(255,0,0,0.3)' }}>
+                      📺 YouTube
+                    </a>
+                  )}
+                  {profile.instagram_url && (
+                    <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80"
+                      style={{ background: 'rgba(225,48,108,0.15)', color: '#E1306C', border: '1px solid rgba(225,48,108,0.3)' }}>
+                      📸 Instagram
+                    </a>
+                  )}
+                  {profile.tiktok_url && (
+                    <a href={profile.tiktok_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80"
+                      style={{ background: 'rgba(105,201,208,0.15)', color: '#69C9D0', border: '1px solid rgba(105,201,208,0.3)' }}>
+                      🎵 TikTok
+                    </a>
+                  )}
+                  {profile.kwai_url && (
+                    <a href={profile.kwai_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition hover:opacity-80"
+                      style={{ background: 'rgba(255,165,0,0.15)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)' }}>
+                      🎬 Kwai
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

@@ -82,7 +82,10 @@ export default function SampleCard({ sample }: SampleCardProps) {
       )}
 
       {/* Category & Title */}
-      <span className="badge badge-blue text-xs mb-2">{sample.category}</span>
+      <div className="flex gap-2 mb-2">
+        <span className="badge badge-blue text-xs">{sample.category}</span>
+        {sample.style && <span className="badge text-xs" style={{ background: 'rgba(123,63,228,0.15)', color: '#9B6DFF', border: '1px solid rgba(123,63,228,0.3)' }}>{sample.style}</span>}
+      </div>
       <h3 className="text-lg font-bold mb-3">{sample.title}</h3>
 
       {/* Player */}

@@ -7,12 +7,14 @@ import SampleCard from '@/components/SampleCard'
 import type { Sample, Profile } from '@/lib/types'
 
 const MUSICAL_KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+const STYLES = ['Rock', 'Jazz', 'Pop', 'Samba', 'MPB', 'Funk', 'Blues', 'Metal', 'Eletrônica', 'Reggae', 'Forró', 'Clássico']
 
 export default function RiffStorePage() {
   const [samples, setSamples] = useState<Sample[]>([])
   const [topCreators, setTopCreators] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [styleFilter, setStyleFilter] = useState<string>('')
   const [licenseFilter, setLicenseFilter] = useState<string>('')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -21,6 +23,7 @@ export default function RiffStorePage() {
   const [form, setForm] = useState({
     title: '',
     category: '',
+    style: '',
     bpm: '',
     key: 'C',
     license: 'free',
@@ -28,7 +31,7 @@ export default function RiffStorePage() {
   })
   const supabase = createClient()
 
-  useEffect(() => { fetchSamples() }, [categoryFilter, licenseFilter])
+  useEffect(() => { fetchSamples() }, [categoryFilter, styleFilter, licenseFilter])
   useEffect(() => { fetchTopCreators() }, [])
 
   const fetchSamples = async () => {
@@ -36,6 +39,7 @@ export default function RiffStorePage() {
       setLoading(true)
       let query = supabase.from('samples').select('*, creator:profiles(*)').order('created_at', { ascending: false })
       if (categoryFilter) query = query.eq('category', categoryFilter)
+      if (styleFilter) query = query.eq('style', styleFilter)
       if (licenseFilter) query = query.eq('license', licenseFilter)
       const { data, error } = await query
       if (error) throw error
@@ -64,7 +68,6 @@ export default function RiffStorePage() {
       const profile = await getOrCreateProfile()
       if (!profile) { setError('Faça login para subir um sample'); setSaving(false); return }
 
-      // Upload audio file
       const fileExt = audioFile.name.split('.').pop()
       const fileName = `${profile.id}/${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage.from('audio').upload(fileName, audioFile)
@@ -72,10 +75,11 @@ export default function RiffStorePage() {
 
       const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(fileName)
 
-      await supabase.from('samples').insert({
+      const { error: insertError } = await supabase.from('samples').insert({
         title: form.title,
         creator_id: profile.id,
         category: form.category,
+        style: form.style || null,
         bpm: parseInt(form.bpm),
         key: form.key,
         license: form.license,
@@ -84,11 +88,12 @@ export default function RiffStorePage() {
         downloads: 0,
       })
 
-      // Add points to creator
+      if (insertError) throw insertError
+
       await supabase.from('profiles').update({ points: (profile.points || 0) + 10 }).eq('id', profile.id)
 
       setShowModal(false)
-      setForm({ title: '', category: '', bpm: '', key: 'C', license: 'free', tags: '' })
+      setForm({ title: '', category: '', style: '', bpm: '', key: 'C', license: 'free', tags: '' })
       setAudioFile(null)
       fetchSamples()
       fetchTopCreators()
@@ -124,7 +129,7 @@ export default function RiffStorePage() {
             <div className="sticky top-20 space-y-6">
               <div className="card">
                 <h3 className="font-bold mb-4">Categorias</h3>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <button onClick={() => setCategoryFilter('')} className={`block w-full text-left text-sm px-3 py-2 rounded transition ${categoryFilter === '' ? 'bg-red text-white' : 'hover:bg-card'}`}>Todas</button>
                   {categories.map((cat) => (
                     <button key={cat} onClick={() => setCategoryFilter(cat)} className={`block w-full text-left text-sm px-3 py-2 rounded transition ${categoryFilter === cat ? 'bg-red text-white' : 'hover:bg-card'}`}>{cat}</button>
@@ -133,8 +138,18 @@ export default function RiffStorePage() {
               </div>
 
               <div className="card">
+                <h3 className="font-bold mb-4">Estilo Musical</h3>
+                <div className="space-y-1">
+                  <button onClick={() => setStyleFilter('')} className={`block w-full text-left text-sm px-3 py-2 rounded transition ${styleFilter === '' ? 'bg-blue text-white' : 'hover:bg-card'}`}>Todos</button>
+                  {STYLES.map((s) => (
+                    <button key={s} onClick={() => setStyleFilter(s)} className={`block w-full text-left text-sm px-3 py-2 rounded transition ${styleFilter === s ? 'bg-blue text-white' : 'hover:bg-card'}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card">
                 <h3 className="font-bold mb-4">Licença</h3>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <button onClick={() => setLicenseFilter('')} className={`block w-full text-left text-sm px-3 py-2 rounded transition ${licenseFilter === '' ? 'bg-red text-white' : 'hover:bg-card'}`}>Todas</button>
                   {licenses.map((lic) => (
                     <button key={lic.value} onClick={() => setLicenseFilter(lic.value)} className={`block w-full text-left text-sm px-3 py-2 rounded transition ${licenseFilter === lic.value ? 'bg-red text-white' : 'hover:bg-card'}`}>{lic.label}</button>
@@ -155,15 +170,6 @@ export default function RiffStorePage() {
                         <p className="text-xs text-muted">{creator.points} pts</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="card">
-                <h3 className="font-bold mb-4">Níveis</h3>
-                <div className="space-y-2 text-xs">
-                  {[['🎸','Novato (0+)'],['🎹','Sideman (100+)'],['🎤','Session (500+)'],['⭐','Referência (1500+)'],['👑','Lenda (5000+)']].map(([icon, label]) => (
-                    <div key={label} className="flex gap-2 items-center"><span>{icon}</span><span>{label}</span></div>
                   ))}
                 </div>
               </div>
@@ -205,6 +211,15 @@ export default function RiffStorePage() {
                 <div className="flex flex-wrap gap-2">
                   {categories.map((cat) => (
                     <button key={cat} onClick={() => setForm({ ...form, category: cat })} className={`px-3 py-1 rounded text-sm transition ${form.category === cat ? 'bg-red text-white' : 'bg-dark border border-border text-muted hover:border-red'}`}>{cat}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-muted mb-2">Estilo Musical</label>
+                <div className="flex flex-wrap gap-2">
+                  {STYLES.map((s) => (
+                    <button key={s} onClick={() => setForm({ ...form, style: form.style === s ? '' : s })} className={`px-3 py-1 rounded text-sm transition ${form.style === s ? 'bg-blue text-white' : 'bg-dark border border-border text-muted hover:border-blue'}`}>{s}</button>
                   ))}
                 </div>
               </div>

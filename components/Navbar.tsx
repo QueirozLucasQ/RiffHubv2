@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -75,7 +76,7 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-black text-xl flex-shrink-0">
-          <span style={{ color: 'var(--red)' }}>♪</span>
+          <Image src="/logo.svg" alt="RiffHub" width={32} height={32} className="flex-shrink-0" />
           <span>RiffHub</span>
         </Link>
 

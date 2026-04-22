@@ -30,7 +30,7 @@ export default function FeedPage() {
         .from('riffs')
         .select('*, user:profiles(*), riff_likes(id, user_id)')
         .order('created_at', { ascending: false })
-      if (tagFilter) query = query.filter('tags', 'cs', `["${tagFilter}"]`)
+      if (tagFilter) query = query.contains('tags', [tagFilter])
       const { data, error } = await query
       if (error) throw error
       setRiffs(data || [])

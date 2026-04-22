@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   title: 'RiffHub - Plataforma Social para Músicos',
   description: 'Colabore, compartilhe riffs, acesse samples e encontre gigs musicais',
   viewport: 'width=device-width, initial-scale=1',
+  icons: {
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
+  },
 }
 
 export default function RootLayout({
