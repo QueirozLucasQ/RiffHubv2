@@ -96,10 +96,12 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                   <h1 className="text-2xl md:text-3xl font-bold">{profile.name}</h1>
                   {profile.city && <p className="text-muted text-sm">📍 {profile.city}</p>}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <LevelBadge points={profile.points} size="lg" />
-                  {isOwner && (
+                  {isOwner ? (
                     <Link href="/profile/edit" className="btn btn-secondary btn-sm">✏️ Editar</Link>
+                  ) : (
+                    <Link href={`/chat/${profile.id}`} className="btn btn-secondary btn-sm">💬 Mensagem</Link>
                   )}
                 </div>
               </div>

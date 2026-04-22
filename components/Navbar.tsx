@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import NotificationBell from './NotificationBell'
 import type { Profile } from '@/lib/types'
 
 export default function Navbar() {
@@ -98,7 +99,16 @@ export default function Navbar() {
         </div>
 
         {/* Auth */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {!loading && user && profile && <NotificationBell />}
+          {!loading && user && profile && (
+            <Link href="/chat" className="p-2 rounded-lg transition hover:bg-card"
+              style={{ color: pathname === '/chat' ? 'var(--white)' : 'var(--subtle)' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </Link>
+          )}
           {!loading && (
             user && profile ? (
               <div className="relative" ref={menuRef}>
