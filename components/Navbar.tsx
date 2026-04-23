@@ -100,8 +100,8 @@ export default function Navbar() {
 
         {/* Auth */}
         <div className="flex items-center gap-2">
-          {!loading && user && profile && <NotificationBell />}
-          {!loading && user && profile && (
+          {!loading && user && <NotificationBell />}
+          {!loading && user && (
             <Link href="/chat" className="p-2 rounded-lg transition hover:bg-card"
               style={{ color: pathname === '/chat' ? 'var(--white)' : 'var(--subtle)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -189,6 +189,20 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
+          {user && (
+            <>
+              <Link href="/chat" onClick={() => setMobileOpen(false)}
+                className="px-3 py-2 rounded-lg text-sm font-medium"
+                style={{ color: pathname === '/chat' ? 'var(--white)' : 'var(--subtle)', background: pathname === '/chat' ? 'var(--card)' : 'transparent' }}>
+                💬 Mensagens
+              </Link>
+              <Link href="/notifications" onClick={() => setMobileOpen(false)}
+                className="px-3 py-2 rounded-lg text-sm font-medium"
+                style={{ color: pathname === '/notifications' ? 'var(--white)' : 'var(--subtle)', background: pathname === '/notifications' ? 'var(--card)' : 'transparent' }}>
+                🔔 Notificações
+              </Link>
+            </>
+          )}
         </div>
       )}
     </nav>
