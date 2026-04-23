@@ -253,7 +253,16 @@ export default function RiffStorePage() {
 
               <div>
                 <label className="block text-sm text-muted mb-1">Arquivo de Áudio * (MP3, WAV)</label>
-                <input type="file" accept="audio/*" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} className="w-full px-4 py-2 bg-dark border border-border rounded text-white text-sm" />
+                <label className="flex items-center gap-3 w-full px-4 py-3 rounded-lg cursor-pointer transition-colors"
+                  style={{ background: 'var(--dark)', border: '2px dashed var(--border)' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--red)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = audioFile ? 'var(--red)' : 'var(--border)')}>
+                  <input type="file" accept="audio/*" className="hidden" onChange={(e) => setAudioFile(e.target.files?.[0] || null)} />
+                  <span className="text-lg">🎵</span>
+                  <span className="text-sm" style={{ color: audioFile ? 'var(--white)' : 'var(--muted)' }}>
+                    {audioFile ? audioFile.name : 'Clique para escolher MP3 ou WAV'}
+                  </span>
+                </label>
               </div>
             </div>
 
