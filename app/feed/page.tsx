@@ -26,19 +26,29 @@ export default function FeedPage() {
   const [riffs, setRiffs] = useState<Riff[]>([])
   const [loading, setLoading] = useState(true)
   const [tagFilter, setTagFilter] = useState('')
+  const [feedTab, setFeedTab] = useState<'todos' | 'seguindo'>('todos')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [myProfileId, setMyProfileId] = useState<string | null>(null)
+  const [followingIds, setFollowingIds] = useState<string[]>([])
   const [form, setForm] = useState({ title: '', description: '', tags: [] as string[] })
   const supabase = createClient()
 
   useEffect(() => {
-    getOrCreateProfile().then(p => { if (p) setMyProfileId(p.id) })
+    const init = async () => {
+      const profile = await getOrCreateProfile()
+      if (profile) {
+        setMyProfileId(profile.id)
+        const { data: follows } = await supabase.from('follows').select('following_id').eq('follower_id', profile.id)
+        setFollowingIds((follows || []).map((f: any) => f.following_id))
+      }
+    }
+    init()
   }, [])
 
-  useEffect(() => { fetchRiffs() }, [tagFilter])
+  useEffect(() => { fetchRiffs() }, [tagFilter, feedTab, followingIds])
 
   const fetchRiffs = async () => {
     try {
@@ -47,7 +57,18 @@ export default function FeedPage() {
         .from('riffs')
         .select('*, user:profiles(*), riff_likes(id, user_id)')
         .order('created_at', { ascending: false })
+
       if (tagFilter) query = query.contains('tags', [tagFilter])
+
+      if (feedTab === 'seguindo') {
+        if (followingIds.length === 0) {
+          setRiffs([])
+          setLoading(false)
+          return
+        }
+        query = query.in('user_id', followingIds)
+      }
+
       const { data } = await query
       setRiffs(data || [])
     } finally {
@@ -127,6 +148,22 @@ export default function FeedPage() {
             </svg>
             Postar Riff
           </button>
+        </div>
+
+        {/* Feed tabs */}
+        <div className="flex items-center gap-1 mb-6 p-1 rounded-xl w-fit" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          {(['todos', 'seguindo'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setFeedTab(tab)}
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
+              style={{
+                background: feedTab === tab ? 'var(--red)' : 'transparent',
+                color: feedTab === tab ? 'white' : 'var(--muted)',
+              }}>
+              {tab === 'todos' ? '🌐 Todos' : '👥 Seguindo'}
+            </button>
+          ))}
         </div>
 
         {/* Tag filters */}
@@ -227,7 +264,7 @@ export default function FeedPage() {
                       style={{ color: isLiked ? '#f87171' : 'var(--muted)' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-              </svg>
+                      </svg>
                       <span className="font-medium">{riff.riff_likes?.length || 0}</span>
                     </button>
                     <div className="flex items-center gap-1.5 text-sm px-2 py-1" style={{ color: 'var(--muted)' }}>
@@ -250,6 +287,17 @@ export default function FeedPage() {
                 </div>
               )
             })}
+          </div>
+        ) : feedTab === 'seguindo' ? (
+          <div className="empty-state py-20">
+            <div className="empty-state-icon">👥</div>
+            <p className="text-xl font-bold mb-2">Nenhum riff dos seus seguidos</p>
+            <p className="text-muted text-sm mb-5">
+              {followingIds.length === 0
+                ? 'Siga músicos para ver os riffs deles aqui'
+                : 'Os músicos que você segue ainda não postaram nada'}
+            </p>
+            <Link href="/search" className="btn btn-primary">Encontrar Músicos</Link>
           </div>
         ) : (
           <div className="empty-state py-20">

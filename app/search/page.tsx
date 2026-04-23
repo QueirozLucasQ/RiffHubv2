@@ -14,7 +14,25 @@ export default function SearchPage() {
   const [searchName, setSearchName] = useState('')
   const [searchCity, setSearchCity] = useState('')
   const [instrumentFilter, setInstrumentFilter] = useState('')
+  const [myProfileId, setMyProfileId] = useState<string | null>(null)
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set())
+  const [followLoading, setFollowLoading] = useState<Set<string>>(new Set())
   const supabase = createClient()
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single()
+        if (profile) {
+          setMyProfileId(profile.id)
+          const { data: follows } = await supabase.from('follows').select('following_id').eq('follower_id', profile.id)
+          setFollowingIds(new Set((follows || []).map((f: any) => f.following_id)))
+        }
+      }
+    }
+    init()
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => searchMusicians(), 300)
@@ -35,6 +53,35 @@ export default function SearchPage() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFollow = async (e: React.MouseEvent, musicianId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!myProfileId || followLoading.has(musicianId)) return
+
+    setFollowLoading(prev => new Set(prev).add(musicianId))
+    try {
+      if (followingIds.has(musicianId)) {
+        await supabase.from('follows').delete().eq('follower_id', myProfileId).eq('following_id', musicianId)
+        setFollowingIds(prev => { const s = new Set(prev); s.delete(musicianId); return s })
+      } else {
+        await supabase.from('follows').insert({ follower_id: myProfileId, following_id: musicianId })
+        setFollowingIds(prev => new Set(prev).add(musicianId))
+        await supabase.from('notifications').insert({
+          user_id: musicianId,
+          type: 'new_follower',
+          title: 'Novo seguidor',
+          body: 'Alguém começou a te seguir',
+          link: `/profile/${myProfileId}`,
+          read: false,
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setFollowLoading(prev => { const s = new Set(prev); s.delete(musicianId); return s })
     }
   }
 
@@ -80,42 +127,63 @@ export default function SearchPage() {
               {musicians.length} músico{musicians.length !== 1 ? 's' : ''} encontrado{musicians.length !== 1 ? 's' : ''}
             </p>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {musicians.map(musician => (
-                <Link key={musician.id} href={`/profile/${musician.id}`} className="card card-hover block">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
-                      style={{ backgroundColor: musician.avatar_color }}>
-                      {musician.name.charAt(0).toUpperCase()}
+              {musicians.map(musician => {
+                const isMe = musician.id === myProfileId
+                const following = followingIds.has(musician.id)
+                const pending = followLoading.has(musician.id)
+                return (
+                  <Link key={musician.id} href={`/profile/${musician.id}`} className="card card-hover block">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
+                        style={{ backgroundColor: musician.avatar_color }}>
+                        {musician.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold truncate">{musician.name}</p>
+                        {musician.city && <p className="text-sm text-muted">📍 {musician.city}</p>}
+                      </div>
+                      <LevelBadge points={musician.points} size="sm" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold truncate">{musician.name}</p>
-                      {musician.city && <p className="text-sm text-muted">📍 {musician.city}</p>}
-                    </div>
-                    <LevelBadge points={musician.points} size="sm" />
-                  </div>
 
-                  {musician.bio && (
-                    <p className="text-sm text-muted mb-3 line-clamp-2">{musician.bio}</p>
-                  )}
+                    {musician.bio && (
+                      <p className="text-sm text-muted mb-3 line-clamp-2">{musician.bio}</p>
+                    )}
 
-                  {musician.instruments?.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {musician.instruments.slice(0, 3).map((inst: string) => (
-                        <span key={inst} className="badge badge-blue text-xs">{inst}</span>
-                      ))}
-                      {musician.instruments.length > 3 && (
-                        <span className="text-xs text-muted">+{musician.instruments.length - 3}</span>
+                    {musician.instruments?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {musician.instruments.slice(0, 3).map((inst: string) => (
+                          <span key={inst} className="badge badge-blue text-xs">{inst}</span>
+                        ))}
+                        {musician.instruments.length > 3 && (
+                          <span className="text-xs text-muted">+{musician.instruments.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="pt-3 border-t flex items-center justify-between"
+                      style={{ borderColor: 'var(--border)' }}>
+                      <span className="text-xs text-muted">{musician.points} pts</span>
+                      {myProfileId && !isMe ? (
+                        <button
+                          onClick={e => handleFollow(e, musician.id)}
+                          disabled={pending}
+                          className="flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold transition-all"
+                          style={{
+                            background: following ? 'transparent' : 'rgba(229,57,53,0.15)',
+                            color: following ? 'var(--subtle)' : 'var(--red)',
+                            border: `1px solid ${following ? 'var(--border)' : 'rgba(229,57,53,0.4)'}`,
+                          }}>
+                          {pending ? (
+                            <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                          ) : following ? '✓ Seguindo' : '+ Seguir'}
+                        </button>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--blue-light)' }}>Ver perfil →</span>
                       )}
                     </div>
-                  )}
-
-                  <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted"
-                    style={{ borderColor: 'var(--border)' }}>
-                    <span>{musician.points} pts</span>
-                    <span className="text-blue">Ver perfil →</span>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                )
+              })}
             </div>
           </>
         ) : (

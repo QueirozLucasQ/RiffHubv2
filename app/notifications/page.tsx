@@ -52,6 +52,7 @@ export default function NotificationsPage() {
     collab_accepted: '✅',
     collab_rejected: '❌',
     riff_like: '♥',
+    new_follower: '👤',
     default: '🔔',
   }
 

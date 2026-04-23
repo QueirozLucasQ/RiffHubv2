@@ -20,6 +20,11 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   const [isOwner, setIsOwner] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'riffs' | 'projects' | 'gigs'>('riffs')
+  const [myProfileId, setMyProfileId] = useState<string | null>(null)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
+  const [followLoading, setFollowLoading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -35,20 +40,37 @@ export default function ProfilePage({ params }: ProfilePageProps) {
         if (!profileData) { setLoading(false); return }
         setProfile(profileData)
 
+        let myId: string | null = null
         if (user) {
           const { data: myProfile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single()
-          setIsOwner(myProfile?.id === params.id)
+          myId = myProfile?.id || null
+          setMyProfileId(myId)
+          setIsOwner(myId === params.id)
         }
 
-        const [{ data: riffsData }, { data: projectsData }, { data: gigsData }] = await Promise.all([
+        const [{ data: riffsData }, { data: projectsData }, { data: gigsData }, followersRes, followingRes] = await Promise.all([
           supabase.from('riffs').select('*, riff_likes(id)').eq('user_id', profileData.id).order('created_at', { ascending: false }),
           supabase.from('projects').select('*, tracks:project_tracks(*)').eq('owner_id', profileData.id).order('created_at', { ascending: false }),
           supabase.from('gigs').select('*').eq('poster_id', profileData.id).order('created_at', { ascending: false }),
+          supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', params.id),
+          supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', params.id),
         ])
 
         setRiffs(riffsData || [])
         setProjects(projectsData || [])
         setGigs(gigsData || [])
+        setFollowersCount(followersRes.count || 0)
+        setFollowingCount(followingRes.count || 0)
+
+        if (myId && myId !== params.id) {
+          const { data: followData } = await supabase
+            .from('follows')
+            .select('id')
+            .eq('follower_id', myId)
+            .eq('following_id', params.id)
+            .maybeSingle()
+          setIsFollowing(!!followData)
+        }
       } catch (err) {
         console.error(err)
       } finally {
@@ -57,6 +79,35 @@ export default function ProfilePage({ params }: ProfilePageProps) {
     }
     fetchAll()
   }, [params.id])
+
+  const handleFollow = async () => {
+    if (!myProfileId || followLoading) return
+    setFollowLoading(true)
+    try {
+      if (isFollowing) {
+        await supabase.from('follows').delete().eq('follower_id', myProfileId).eq('following_id', params.id)
+        setIsFollowing(false)
+        setFollowersCount(prev => Math.max(0, prev - 1))
+      } else {
+        await supabase.from('follows').insert({ follower_id: myProfileId, following_id: params.id })
+        setIsFollowing(true)
+        setFollowersCount(prev => prev + 1)
+        // Send notification to followed user
+        await supabase.from('notifications').insert({
+          user_id: params.id,
+          type: 'new_follower',
+          title: 'Novo seguidor',
+          body: 'Alguém começou a te seguir',
+          link: `/profile/${myProfileId}`,
+          read: false,
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setFollowLoading(false)
+    }
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -101,8 +152,40 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                   {isOwner ? (
                     <Link href="/profile/edit" className="btn btn-secondary btn-sm">✏️ Editar</Link>
                   ) : (
-                    <Link href={`/chat/${profile.id}`} className="btn btn-secondary btn-sm">💬 Mensagem</Link>
+                    <div className="flex items-center gap-2">
+                      {myProfileId && (
+                        <button
+                          onClick={handleFollow}
+                          disabled={followLoading}
+                          className="btn btn-sm transition-all"
+                          style={{
+                            background: isFollowing ? 'transparent' : 'var(--red)',
+                            color: isFollowing ? 'var(--subtle)' : 'white',
+                            border: isFollowing ? '1px solid var(--border-light)' : '1px solid var(--red)',
+                            minWidth: 100,
+                          }}>
+                          {followLoading ? (
+                            <span className="flex items-center gap-1.5">
+                              <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                            </span>
+                          ) : isFollowing ? '✓ Seguindo' : '+ Seguir'}
+                        </button>
+                      )}
+                      <Link href={`/chat/${profile.id}`} className="btn btn-secondary btn-sm">💬 Mensagem</Link>
+                    </div>
                   )}
+                </div>
+              </div>
+
+              {/* Followers / Following counts */}
+              <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="font-bold">{followersCount}</span>
+                  <span style={{ color: 'var(--muted)' }}>seguidores</span>
+                </div>
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="font-bold">{followingCount}</span>
+                  <span style={{ color: 'var(--muted)' }}>seguindo</span>
                 </div>
               </div>
 
