@@ -53,6 +53,9 @@ export default function NotificationsPage() {
     collab_rejected: '❌',
     riff_like: '♥',
     new_follower: '👤',
+    gig_application: '💼',
+    gig_accepted: '🎉',
+    gig_rejected: '😔',
     default: '🔔',
   }
 

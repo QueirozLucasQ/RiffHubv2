@@ -51,6 +51,17 @@ export default function GigCard({ gig, isApplied = false, onApplied }: GigCardPr
       } else {
         setApplied(true)
         onApplied?.()
+        // Notify gig owner
+        if (gig.poster_id && gig.poster_id !== profile.id) {
+          await supabase.from('notifications').insert({
+            user_id: gig.poster_id,
+            type: 'gig_application',
+            title: `${profile.name} se candidatou à sua gig`,
+            body: gig.title,
+            link: `/gigs`,
+            read: false,
+          })
+        }
       }
     } catch (err: any) {
       setError(err?.message || 'Erro ao candidatar')

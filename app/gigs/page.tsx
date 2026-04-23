@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getOrCreateProfile } from '@/lib/getOrCreateProfile'
 import GigCard from '@/components/GigCard'
-import type { Gig } from '@/lib/types'
+import Link from 'next/link'
+import type { Gig, GigApplication } from '@/lib/types'
 
 const PAY_FILTERS = [
   { label: 'Qualquer valor', value: '' },
@@ -21,6 +22,10 @@ export default function GigsPage() {
   const [feedTab, setFeedTab] = useState<'todas' | 'minhas'>('todas')
   const [myProfileId, setMyProfileId] = useState<string | null>(null)
   const [deletingGigId, setDeletingGigId] = useState<string | null>(null)
+  const [applicationsModal, setApplicationsModal] = useState<{ open: boolean; gig: Gig | null }>({ open: false, gig: null })
+  const [applications, setApplications] = useState<GigApplication[]>([])
+  const [loadingApps, setLoadingApps] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [instrumentFilter, setInstrumentFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
   const [locationFilter, setLocationFilter] = useState<'all' | 'remote' | 'onsite'>('all')
@@ -90,6 +95,43 @@ export default function GigsPage() {
       setGigs(prev => prev.filter(g => g.id !== gigId))
     } catch (err) { console.error(err) }
     finally { setDeletingGigId(null) }
+  }
+
+  const openApplicationsModal = async (gig: Gig) => {
+    setApplicationsModal({ open: true, gig })
+    setLoadingApps(true)
+    try {
+      const { data } = await supabase
+        .from('gig_applications')
+        .select('*, musician:profiles(*)')
+        .eq('gig_id', gig.id)
+        .order('created_at', { ascending: false })
+      setApplications((data || []) as GigApplication[])
+    } catch (e) { console.error(e) }
+    finally { setLoadingApps(false) }
+  }
+
+  const handleApplicationAction = async (app: GigApplication, action: 'accepted' | 'rejected') => {
+    setActionLoading(app.id)
+    try {
+      await supabase.from('gig_applications').update({ status: action }).eq('id', app.id)
+      setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: action } : a))
+
+      // Notify the musician
+      const gigTitle = applicationsModal.gig?.title || 'sua candidatura'
+      const isAccepted = action === 'accepted'
+      await supabase.from('notifications').insert({
+        user_id: app.musician_id,
+        type: isAccepted ? 'gig_accepted' : 'gig_rejected',
+        title: isAccepted ? '🎉 Candidatura aceita!' : 'Candidatura não aprovada',
+        body: isAccepted
+          ? `Você foi aceito na gig: ${gigTitle}`
+          : `Sua candidatura para "${gigTitle}" não foi aprovada desta vez.`,
+        link: `/gigs`,
+        read: false,
+      })
+    } catch (e) { console.error(e) }
+    finally { setActionLoading(null) }
   }
 
   const handleCloseGig = async (gigId: string) => {
@@ -270,20 +312,29 @@ export default function GigsPage() {
                     <GigCard gig={gig} isApplied={appliedGigIds.has(gig.id)}
                       onApplied={() => setAppliedGigIds(prev => new Set([...prev, gig.id]))} />
                     {feedTab === 'minhas' && gig.poster_id === myProfileId && (
-                      <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {gig.status === 'open' && (
-                          <button onClick={() => handleCloseGig(gig.id)}
-                            className="text-xs px-2 py-1 rounded-lg font-medium transition hover:opacity-80"
-                            style={{ background: 'rgba(253,224,71,0.15)', color: '#FDE047', border: '1px solid rgba(253,224,71,0.35)' }}>
-                            ✕ Fechar
-                          </button>
-                        )}
-                        <button onClick={() => handleDeleteGig(gig.id)} disabled={deletingGigId === gig.id}
-                          className="text-xs px-2 py-1 rounded-lg font-medium transition hover:opacity-80"
-                          style={{ background: 'rgba(229,57,53,0.15)', color: '#f87171', border: '1px solid rgba(229,57,53,0.35)' }}>
-                          {deletingGigId === gig.id ? '...' : '🗑'}
+                      <>
+                        {/* Candidaturas button */}
+                        <button
+                          onClick={() => openApplicationsModal(gig)}
+                          className="absolute bottom-3 left-3 right-3 text-xs px-3 py-1.5 rounded-lg font-semibold transition opacity-0 group-hover:opacity-100"
+                          style={{ background: 'rgba(30,136,229,0.18)', color: 'var(--blue)', border: '1px solid rgba(30,136,229,0.35)' }}>
+                          👥 Ver Candidaturas
                         </button>
-                      </div>
+                        <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {gig.status === 'open' && (
+                            <button onClick={() => handleCloseGig(gig.id)}
+                              className="text-xs px-2 py-1 rounded-lg font-medium transition hover:opacity-80"
+                              style={{ background: 'rgba(253,224,71,0.15)', color: '#FDE047', border: '1px solid rgba(253,224,71,0.35)' }}>
+                              ✕ Fechar
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteGig(gig.id)} disabled={deletingGigId === gig.id}
+                            className="text-xs px-2 py-1 rounded-lg font-medium transition hover:opacity-80"
+                            style={{ background: 'rgba(229,57,53,0.15)', color: '#f87171', border: '1px solid rgba(229,57,53,0.35)' }}>
+                            {deletingGigId === gig.id ? '...' : '🗑'}
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 ))}
@@ -303,6 +354,100 @@ export default function GigsPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal Candidaturas */}
+      {applicationsModal.open && (
+        <div className="fixed inset-0 bg-black/80 flex items-end md:items-center justify-center z-50 px-4 pb-0 md:pb-4">
+          <div className="w-full max-w-lg rounded-t-2xl md:rounded-2xl overflow-hidden flex flex-col"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', maxHeight: '85vh' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+              <div>
+                <h2 className="text-lg font-bold">Candidaturas</h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{applicationsModal.gig?.title}</p>
+              </div>
+              <button onClick={() => setApplicationsModal({ open: false, gig: null })}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-lg hover:bg-dark transition"
+                style={{ color: 'var(--muted)' }}>×</button>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3">
+              {loadingApps ? (
+                <div className="space-y-3">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse" style={{ background: 'var(--dark)' }}>
+                      <div className="w-10 h-10 rounded-full" style={{ background: 'var(--border)' }} />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-1/2 rounded" style={{ background: 'var(--border)' }} />
+                        <div className="h-2 w-1/3 rounded" style={{ background: 'var(--border)' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : applications.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-3">📭</div>
+                  <p className="font-semibold mb-1">Nenhuma candidatura ainda</p>
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>Quando músicos se candidatarem, aparecerão aqui.</p>
+                </div>
+              ) : (
+                applications.map(app => {
+                  const musician = app.musician as any
+                  const isPending = app.status === 'pending'
+                  const isAccepted = app.status === 'accepted'
+                  const isRejected = app.status === 'rejected'
+                  return (
+                    <div key={app.id} className="flex items-center gap-3 p-3 rounded-xl transition"
+                      style={{ background: 'var(--dark)', border: '1px solid var(--border)' }}>
+                      {/* Avatar */}
+                      <Link href={`/profile/${app.musician_id}`} onClick={() => setApplicationsModal({ open: false, gig: null })}>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0"
+                          style={{ backgroundColor: musician?.avatar_color || '#666' }}>
+                          {musician?.name?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                      </Link>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/profile/${app.musician_id}`} onClick={() => setApplicationsModal({ open: false, gig: null })}
+                          className="font-semibold text-sm hover:underline truncate block">{musician?.name || 'Músico'}</Link>
+                        <p className="text-xs" style={{ color: 'var(--muted)' }}>{musician?.city || ''}</p>
+                      </div>
+                      {/* Status / Actions */}
+                      {isPending ? (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleApplicationAction(app, 'accepted')}
+                            disabled={actionLoading === app.id}
+                            className="text-xs px-3 py-1.5 rounded-lg font-semibold transition hover:opacity-80"
+                            style={{ background: 'rgba(67,160,71,0.2)', color: '#4caf50', border: '1px solid rgba(67,160,71,0.4)' }}>
+                            {actionLoading === app.id ? '...' : '✓ Aceitar'}
+                          </button>
+                          <button
+                            onClick={() => handleApplicationAction(app, 'rejected')}
+                            disabled={actionLoading === app.id}
+                            className="text-xs px-3 py-1.5 rounded-lg font-semibold transition hover:opacity-80"
+                            style={{ background: 'rgba(229,57,53,0.15)', color: '#f87171', border: '1px solid rgba(229,57,53,0.3)' }}>
+                            {actionLoading === app.id ? '...' : '✕ Recusar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0"
+                          style={isAccepted
+                            ? { background: 'rgba(67,160,71,0.2)', color: '#4caf50', border: '1px solid rgba(67,160,71,0.4)' }
+                            : { background: 'rgba(229,57,53,0.15)', color: '#f87171', border: '1px solid rgba(229,57,53,0.3)' }}>
+                          {isAccepted ? '✓ Aceito' : '✕ Recusado'}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Postar Gig */}
       {showModal && (
