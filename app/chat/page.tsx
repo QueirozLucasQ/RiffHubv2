@@ -17,30 +17,54 @@ export default function ChatPage() {
       if (!profile) return
       setMyProfileId(profile.id)
 
-      const { data } = await supabase
+      // Fetch all messages involving this user
+      const { data: messages } = await supabase
         .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(*), receiver:profiles!messages_receiver_id_fkey(*)')
+        .select('*')
         .or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`)
         .order('created_at', { ascending: false })
 
-      if (data) {
-        // Group by conversation partner
-        const seen = new Set<string>()
-        const convos: any[] = []
-        for (const msg of data) {
-          const partner = msg.sender_id === profile.id ? msg.receiver : msg.sender
-          if (!seen.has(partner.id)) {
-            seen.add(partner.id)
-            const unread = data.filter(m =>
-              m.sender_id === partner.id &&
-              m.receiver_id === profile.id &&
-              !m.read
-            ).length
-            convos.push({ partner, lastMessage: msg, unread })
-          }
-        }
-        setConversations(convos)
+      if (!messages || messages.length === 0) {
+        setLoading(false)
+        return
       }
+
+      // Collect unique partner IDs
+      const partnerIds = new Set<string>()
+      for (const msg of messages) {
+        const partnerId = msg.sender_id === profile.id ? msg.receiver_id : msg.sender_id
+        partnerIds.add(partnerId)
+      }
+
+      // Fetch partner profiles separately (avoids FK hint issues)
+      const { data: partnerProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', Array.from(partnerIds))
+
+      const profileMap: Record<string, any> = {}
+      for (const p of (partnerProfiles || [])) {
+        profileMap[p.id] = p
+      }
+
+      // Group by conversation partner (one entry per partner, latest message)
+      const seen = new Set<string>()
+      const convos: any[] = []
+      for (const msg of messages) {
+        const partnerId = msg.sender_id === profile.id ? msg.receiver_id : msg.sender_id
+        if (!seen.has(partnerId)) {
+          seen.add(partnerId)
+          const partner = profileMap[partnerId]
+          if (!partner) continue
+          const unread = messages.filter(m =>
+            m.sender_id === partnerId &&
+            m.receiver_id === profile.id &&
+            !m.read
+          ).length
+          convos.push({ partner, lastMessage: msg, unread })
+        }
+      }
+      setConversations(convos)
       setLoading(false)
     }
     init()
