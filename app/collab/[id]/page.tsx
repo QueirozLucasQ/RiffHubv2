@@ -241,6 +241,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
     } finally { setSendingMsg(false) }
   }
 
+  const handleDeleteComment = async (commentId: string) => {
+    await supabase.from('project_discussions').delete().eq('id', commentId)
+    setDiscussions(prev => prev.filter(d => d.id !== commentId))
+  }
+
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <p className="text-muted">Carregando projeto...</p>
@@ -458,17 +463,28 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
                 {discussions.length === 0 ? (
                   <p className="text-muted text-sm">Sem mensagens ainda. Seja o primeiro!</p>
                 ) : discussions.map(d => (
-                  <div key={d.id} className="flex gap-3 p-3 rounded-lg" style={{ background: 'var(--dark)' }}>
+                  <div key={d.id} className="flex gap-3 p-3 rounded-lg group" style={{ background: 'var(--dark)' }}>
                     {d.user && (
                       <>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                          style={{ backgroundColor: d.user.avatar_color }}>
-                          {d.user.name.charAt(0).toUpperCase()}
-                        </div>
+                        <Link href={`/profile/${d.user.id}`} className="flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white hover:opacity-80 transition"
+                            style={{ backgroundColor: d.user.avatar_color }}>
+                            {d.user.name.charAt(0).toUpperCase()}
+                          </div>
+                        </Link>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold">{d.user.name}</p>
                           <p className="text-sm break-words">{d.text}</p>
                         </div>
+                        {(isOwner || myProfile?.id === d.user_id) && (
+                          <button
+                            onClick={() => handleDeleteComment(d.id)}
+                            className="opacity-0 group-hover:opacity-100 transition flex-shrink-0 self-start mt-0.5 text-xs px-1.5 py-0.5 rounded hover:opacity-80"
+                            style={{ color: '#f87171', border: '1px solid rgba(229,57,53,0.25)' }}
+                            title="Excluir comentário">
+                            🗑
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -524,9 +540,25 @@ export default function ProjectDetailPage({ params }: ProjectDetailProps) {
                           style={{ background: 'var(--dark)', border: '1px solid var(--border)', color: 'var(--white)' }} />
                       </div>
                       <div>
-                        <label className="block text-xs text-muted mb-1">🎵 Áudio de demonstração (opcional)</label>
-                        <input type="file" accept="audio/*" onChange={e => setProposeAudio(e.target.files?.[0] || null)}
-                          className="w-full text-xs" style={{ color: 'var(--muted)' }} />
+                        <label className="block text-xs text-muted mb-1">Áudio de demonstração (opcional)</label>
+                        <input type="file" accept="audio/*" id="propose-audio-upload"
+                          onChange={e => setProposeAudio(e.target.files?.[0] || null)}
+                          className="sr-only" />
+                        <label htmlFor="propose-audio-upload"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition hover:opacity-80"
+                          style={{ background: 'var(--dark)', border: `2px dashed ${proposeAudio ? 'var(--blue)' : 'var(--border)'}` }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                            style={{ color: proposeAudio ? 'var(--blue)' : 'var(--muted)', flexShrink: 0 }}>
+                            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                          </svg>
+                          <span className="text-xs truncate" style={{ color: proposeAudio ? 'var(--white)' : 'var(--muted)' }}>
+                            {proposeAudio ? proposeAudio.name : 'Clique para selecionar MP3 ou WAV'}
+                          </span>
+                          {proposeAudio && (
+                            <button type="button" onClick={e => { e.preventDefault(); setProposeAudio(null) }}
+                              className="ml-auto text-muted hover:text-white flex-shrink-0 text-base leading-none">×</button>
+                          )}
+                        </label>
                       </div>
                     </div>
                     {proposeError && (

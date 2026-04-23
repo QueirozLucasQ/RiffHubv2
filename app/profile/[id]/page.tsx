@@ -22,10 +22,20 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState<'riffs' | 'projects' | 'gigs'>('riffs')
   const [myProfileId, setMyProfileId] = useState<string | null>(null)
   const [deletingRiffId, setDeletingRiffId] = useState<string | null>(null)
+
+  // Follow
   const [isFollowing, setIsFollowing] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [followLoading, setFollowLoading] = useState(false)
+
+  // Followers/following modal
+  const [followModal, setFollowModal] = useState<null | 'followers' | 'following'>(null)
+  const [followList, setFollowList] = useState<any[]>([])
+  const [followListLoading, setFollowListLoading] = useState(false)
+  const [myFollowingIds, setMyFollowingIds] = useState<Set<string>>(new Set())
+  const [modalFollowLoading, setModalFollowLoading] = useState<Set<string>>(new Set())
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -47,6 +57,12 @@ export default function ProfilePage({ params }: ProfilePageProps) {
           myId = myProfile?.id || null
           setMyProfileId(myId)
           setIsOwner(myId === params.id)
+
+          // Load my following IDs for modal buttons
+          if (myId) {
+            const { data: myFollows } = await supabase.from('follows').select('following_id').eq('follower_id', myId)
+            setMyFollowingIds(new Set((myFollows || []).map((f: any) => f.following_id)))
+          }
         }
 
         const [{ data: riffsData }, { data: projectsData }, { data: gigsData }, followersRes, followingRes] = await Promise.all([
@@ -65,11 +81,8 @@ export default function ProfilePage({ params }: ProfilePageProps) {
 
         if (myId && myId !== params.id) {
           const { data: followData } = await supabase
-            .from('follows')
-            .select('id')
-            .eq('follower_id', myId)
-            .eq('following_id', params.id)
-            .maybeSingle()
+            .from('follows').select('id')
+            .eq('follower_id', myId).eq('following_id', params.id).maybeSingle()
           setIsFollowing(!!followData)
         }
       } catch (err) {
@@ -80,6 +93,65 @@ export default function ProfilePage({ params }: ProfilePageProps) {
     }
     fetchAll()
   }, [params.id])
+
+  const openFollowModal = async (type: 'followers' | 'following') => {
+    setFollowModal(type)
+    setFollowListLoading(true)
+    setFollowList([])
+    try {
+      if (type === 'followers') {
+        // People who follow this profile
+        const { data } = await supabase
+          .from('follows')
+          .select('follower:profiles!follows_follower_id_fkey(*)')
+          .eq('following_id', params.id)
+        setFollowList((data || []).map((d: any) => d.follower).filter(Boolean))
+      } else {
+        // People this profile follows
+        const { data } = await supabase
+          .from('follows')
+          .select('following:profiles!follows_following_id_fkey(*)')
+          .eq('follower_id', params.id)
+        setFollowList((data || []).map((d: any) => d.following).filter(Boolean))
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setFollowListLoading(false)
+    }
+  }
+
+  const handleModalFollow = async (targetId: string) => {
+    if (!myProfileId || modalFollowLoading.has(targetId)) return
+    setModalFollowLoading(prev => new Set(prev).add(targetId))
+    try {
+      const isCurrentlyFollowing = myFollowingIds.has(targetId)
+      if (isCurrentlyFollowing) {
+        await supabase.from('follows').delete().eq('follower_id', myProfileId).eq('following_id', targetId)
+        setMyFollowingIds(prev => { const s = new Set(prev); s.delete(targetId); return s })
+        // If we're viewing our own following list, remove from list
+        if (followModal === 'following' && isOwner) {
+          setFollowList(prev => prev.filter(p => p.id !== targetId))
+          setFollowingCount(prev => Math.max(0, prev - 1))
+        }
+      } else {
+        await supabase.from('follows').insert({ follower_id: myProfileId, following_id: targetId })
+        setMyFollowingIds(prev => new Set(prev).add(targetId))
+        await supabase.from('notifications').insert({
+          user_id: targetId,
+          type: 'new_follower',
+          title: 'Novo seguidor',
+          body: 'Alguém começou a te seguir',
+          link: `/profile/${myProfileId}`,
+          read: false,
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setModalFollowLoading(prev => { const s = new Set(prev); s.delete(targetId); return s })
+    }
+  }
 
   const handleDeleteRiff = async (riffId: string) => {
     setDeletingRiffId(riffId)
@@ -99,16 +171,17 @@ export default function ProfilePage({ params }: ProfilePageProps) {
         await supabase.from('follows').delete().eq('follower_id', myProfileId).eq('following_id', params.id)
         setIsFollowing(false)
         setFollowersCount(prev => Math.max(0, prev - 1))
+        setMyFollowingIds(prev => { const s = new Set(prev); s.delete(params.id); return s })
       } else {
         await supabase.from('follows').insert({ follower_id: myProfileId, following_id: params.id })
         setIsFollowing(true)
         setFollowersCount(prev => prev + 1)
-        // Send notification to followed user
+        setMyFollowingIds(prev => new Set(prev).add(params.id))
         await supabase.from('notifications').insert({
           user_id: params.id,
           type: 'new_follower',
-          title: 'Novo seguidor',
-          body: 'Alguém começou a te seguir',
+          title: `${profile?.name || 'Alguém'} começou a te seguir`,
+          body: 'Clique para ver o perfil',
           link: `/profile/${myProfileId}`,
           read: false,
         })
@@ -138,7 +211,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Cover / Header */}
+      {/* Cover */}
       <div className="h-32 md:h-48" style={{ background: `linear-gradient(135deg, ${profile.avatar_color}22 0%, transparent 100%)` }} />
 
       <div className="max-w-5xl mx-auto px-4 pb-16">
@@ -165,9 +238,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                   ) : (
                     <div className="flex items-center gap-2">
                       {myProfileId && (
-                        <button
-                          onClick={handleFollow}
-                          disabled={followLoading}
+                        <button onClick={handleFollow} disabled={followLoading}
                           className="btn btn-sm transition-all"
                           style={{
                             background: isFollowing ? 'transparent' : 'var(--red)',
@@ -175,11 +246,9 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                             border: isFollowing ? '1px solid var(--border-light)' : '1px solid var(--red)',
                             minWidth: 100,
                           }}>
-                          {followLoading ? (
-                            <span className="flex items-center gap-1.5">
-                              <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                            </span>
-                          ) : isFollowing ? '✓ Seguindo' : '+ Seguir'}
+                          {followLoading
+                            ? <span className="flex items-center gap-1.5"><div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" /></span>
+                            : isFollowing ? '✓ Seguindo' : '+ Seguir'}
                         </button>
                       )}
                       <Link href={`/chat/${profile.id}`} className="btn btn-secondary btn-sm">💬 Mensagem</Link>
@@ -188,16 +257,18 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                 </div>
               </div>
 
-              {/* Followers / Following counts */}
+              {/* Followers / Following — clickable */}
               <div className="flex items-center gap-4 mb-3">
-                <div className="flex items-center gap-1 text-sm">
+                <button onClick={() => openFollowModal('followers')}
+                  className="flex items-center gap-1 text-sm hover:opacity-70 transition-opacity">
                   <span className="font-bold">{followersCount}</span>
                   <span style={{ color: 'var(--muted)' }}>seguidores</span>
-                </div>
-                <div className="flex items-center gap-1 text-sm">
+                </button>
+                <button onClick={() => openFollowModal('following')}
+                  className="flex items-center gap-1 text-sm hover:opacity-70 transition-opacity">
                   <span className="font-bold">{followingCount}</span>
                   <span style={{ color: 'var(--muted)' }}>seguindo</span>
-                </div>
+                </button>
               </div>
 
               {/* Level bar */}
@@ -280,7 +351,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
             { label: 'Gigs', count: gigs.length, tab: 'gigs' as const },
           ].map(s => (
             <button key={s.tab} onClick={() => setActiveTab(s.tab)}
-              className={`card text-center transition-all cursor-pointer ${activeTab === s.tab ? 'border-red' : 'hover:border-border-light'}`}
+              className="card text-center transition-all cursor-pointer"
               style={{ borderColor: activeTab === s.tab ? 'var(--red)' : undefined }}>
               <div className="text-2xl font-black mb-1" style={{ color: activeTab === s.tab ? 'var(--red)' : 'var(--white)' }}>{s.count}</div>
               <p className="text-sm text-muted">{s.label}</p>
@@ -334,10 +405,8 @@ export default function ProfilePage({ params }: ProfilePageProps) {
                       </span>
                     </div>
                     <div className="flex gap-2 text-xs text-muted mb-3">
-                      <span>{proj.style}</span>
-                      <span>·</span>
-                      <span>{proj.bpm} BPM</span>
-                      <span>·</span>
+                      <span>{proj.style}</span><span>·</span>
+                      <span>{proj.bpm} BPM</span><span>·</span>
                       <span>Tom {proj.key}</span>
                     </div>
                     <div className="text-xs text-muted">
@@ -379,6 +448,102 @@ export default function ProfilePage({ params }: ProfilePageProps) {
           </div>
         )}
       </div>
+
+      {/* Followers / Following Modal */}
+      {followModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-end md:items-center justify-center z-50 px-4 pb-0 md:pb-4"
+          onClick={e => e.target === e.currentTarget && setFollowModal(null)}>
+          <div className="w-full max-w-md rounded-t-2xl md:rounded-2xl flex flex-col"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)', maxHeight: '80vh' }}>
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
+              style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-1 p-0.5 rounded-lg" style={{ background: 'var(--dark)' }}>
+                <button onClick={() => openFollowModal('followers')}
+                  className="px-3 py-1 rounded-md text-sm font-semibold transition-all"
+                  style={{ background: followModal === 'followers' ? 'var(--card)' : 'transparent', color: followModal === 'followers' ? 'var(--white)' : 'var(--muted)' }}>
+                  {followersCount} Seguidores
+                </button>
+                <button onClick={() => openFollowModal('following')}
+                  className="px-3 py-1 rounded-md text-sm font-semibold transition-all"
+                  style={{ background: followModal === 'following' ? 'var(--card)' : 'transparent', color: followModal === 'following' ? 'var(--white)' : 'var(--muted)' }}>
+                  {followingCount} Seguindo
+                </button>
+              </div>
+              <button onClick={() => setFollowModal(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-white hover:bg-dark transition text-lg leading-none">
+                ×
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1">
+              {followListLoading ? (
+                <div className="space-y-3 py-2">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="flex items-center gap-3 p-2 rounded-xl animate-pulse">
+                      <div className="w-11 h-11 rounded-full flex-shrink-0" style={{ background: 'var(--border)' }} />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 w-28 rounded" style={{ background: 'var(--border)' }} />
+                        <div className="h-2 w-16 rounded" style={{ background: 'var(--border)' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : followList.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-3xl mb-3">{followModal === 'followers' ? '👥' : '🎵'}</p>
+                  <p className="font-semibold mb-1">
+                    {followModal === 'followers' ? 'Nenhum seguidor ainda' : 'Não está seguindo ninguém'}
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                    {followModal === 'followers' ? 'Compartilhe seu perfil para ganhar seguidores' : 'Explore músicos na página de busca'}
+                  </p>
+                </div>
+              ) : (
+                followList.map(person => {
+                  const isMe = person.id === myProfileId
+                  const amFollowing = myFollowingIds.has(person.id)
+                  const pending = modalFollowLoading.has(person.id)
+                  return (
+                    <div key={person.id} className="flex items-center gap-3 p-2 rounded-xl transition hover:bg-dark group">
+                      <Link href={`/profile/${person.id}`} onClick={() => setFollowModal(null)}
+                        className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-black text-white flex-shrink-0"
+                          style={{ backgroundColor: person.avatar_color }}>
+                          {person.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{person.name}</p>
+                          {person.city
+                            ? <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>📍 {person.city}</p>
+                            : <p className="text-xs" style={{ color: 'var(--muted)' }}>{person.points} pts</p>
+                          }
+                        </div>
+                      </Link>
+                      {myProfileId && !isMe && (
+                        <button onClick={() => handleModalFollow(person.id)} disabled={pending}
+                          className="flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-semibold transition-all"
+                          style={{
+                            background: amFollowing ? 'transparent' : 'rgba(229,57,53,0.15)',
+                            color: amFollowing ? 'var(--subtle)' : 'var(--red)',
+                            border: `1px solid ${amFollowing ? 'var(--border)' : 'rgba(229,57,53,0.4)'}`,
+                            minWidth: 80,
+                          }}>
+                          {pending
+                            ? <span className="flex justify-center"><div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" /></span>
+                            : amFollowing ? '✓ Seguindo' : '+ Seguir'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

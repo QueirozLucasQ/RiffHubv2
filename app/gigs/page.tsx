@@ -18,6 +18,9 @@ export default function GigsPage() {
   const [gigs, setGigs] = useState<Gig[]>([])
   const [appliedGigIds, setAppliedGigIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [feedTab, setFeedTab] = useState<'todas' | 'minhas'>('todas')
+  const [myProfileId, setMyProfileId] = useState<string | null>(null)
+  const [deletingGigId, setDeletingGigId] = useState<string | null>(null)
   const [instrumentFilter, setInstrumentFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
   const [locationFilter, setLocationFilter] = useState<'all' | 'remote' | 'onsite'>('all')
@@ -39,7 +42,11 @@ export default function GigsPage() {
   })
   const supabase = createClient()
 
-  useEffect(() => { fetchGigs(); fetchApplied() }, [instrumentFilter, typeFilter, locationFilter, cityFilter])
+  useEffect(() => { fetchGigs(); fetchApplied() }, [instrumentFilter, typeFilter, locationFilter, cityFilter, feedTab, myProfileId])
+
+  useEffect(() => {
+    getOrCreateProfile().then(p => { if (p) setMyProfileId(p.id) })
+  }, [])
 
   const fetchApplied = async () => {
     try {
@@ -47,20 +54,23 @@ export default function GigsPage() {
       if (!profile) return
       const { data } = await supabase.from('gig_applications').select('gig_id').eq('musician_id', profile.id)
       if (data) setAppliedGigIds(new Set(data.map(a => a.gig_id)))
-    } catch (e) {
-      // not logged in, no applied gigs
-    }
+    } catch (e) { /* not logged in */ }
   }
 
   const fetchGigs = async () => {
     try {
       setLoading(true)
-      let query = supabase.from('gigs').select('*, poster:profiles(*)').eq('status', 'open').order('created_at', { ascending: false })
+      let query = supabase.from('gigs').select('*, poster:profiles(*)')
+        .order('created_at', { ascending: false })
+
+      if (feedTab === 'todas') query = query.eq('status', 'open')
+      if (feedTab === 'minhas' && myProfileId) query = query.eq('poster_id', myProfileId)
       if (instrumentFilter) query = query.eq('instrument', instrumentFilter)
       if (typeFilter) query = query.eq('type', typeFilter)
       if (locationFilter === 'remote') query = query.eq('remote', true)
       else if (locationFilter === 'onsite') query = query.eq('remote', false)
       if (cityFilter.trim()) query = query.ilike('city', `%${cityFilter.trim()}%`)
+
       const { data, error } = await query
       if (error) throw error
       setGigs(data || [])
@@ -69,6 +79,22 @@ export default function GigsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDeleteGig = async (gigId: string) => {
+    if (!confirm('Excluir esta gig permanentemente?')) return
+    setDeletingGigId(gigId)
+    try {
+      await supabase.from('gig_applications').delete().eq('gig_id', gigId)
+      await supabase.from('gigs').delete().eq('id', gigId)
+      setGigs(prev => prev.filter(g => g.id !== gigId))
+    } catch (err) { console.error(err) }
+    finally { setDeletingGigId(null) }
+  }
+
+  const handleCloseGig = async (gigId: string) => {
+    await supabase.from('gigs').update({ status: 'closed' }).eq('id', gigId)
+    setGigs(prev => prev.map(g => g.id === gigId ? { ...g, status: 'closed' } : g))
   }
 
   const handleCreateGig = async () => {
@@ -131,11 +157,27 @@ export default function GigsPage() {
     <div className="min-h-screen bg-black">
       <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-12">
-          <h1 className="text-4xl font-bold">Oportunidades de Trabalho</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold">Oportunidades de Trabalho</h1>
+            <p className="text-muted mt-1 text-sm">Encontre shows, gravações e sessões</p>
+          </div>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            Postar Gig
+            + Postar Gig
           </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-8">
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+            {([['todas', '🎸 Todas'], ['minhas', '📋 Minhas Gigs']] as const).map(([tab, label]) => (
+              <button key={tab} onClick={() => setFeedTab(tab)}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: feedTab === tab ? 'var(--red)' : 'transparent', color: feedTab === tab ? 'white' : 'var(--muted)' }}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-4 gap-8">
@@ -213,16 +255,50 @@ export default function GigsPage() {
               </div>
             )}
             {loading ? (
-              <div className="text-center py-12 text-muted"><p>Carregando gigs...</p></div>
+              <div className="space-y-4">
+                {[1,2,3].map(i => (
+                  <div key={i} className="card animate-pulse space-y-3">
+                    <div className="h-4 w-2/3 rounded" style={{ background: 'var(--border)' }} />
+                    <div className="h-3 w-1/2 rounded" style={{ background: 'var(--border)' }} />
+                  </div>
+                ))}
+              </div>
             ) : filteredGigs.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-6">
                 {filteredGigs.map((gig) => (
-                  <GigCard key={gig.id} gig={gig} isApplied={appliedGigIds.has(gig.id)}
-                    onApplied={() => setAppliedGigIds(prev => new Set([...prev, gig.id]))} />
+                  <div key={gig.id} className="relative group">
+                    <GigCard gig={gig} isApplied={appliedGigIds.has(gig.id)}
+                      onApplied={() => setAppliedGigIds(prev => new Set([...prev, gig.id]))} />
+                    {feedTab === 'minhas' && gig.poster_id === myProfileId && (
+                      <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {gig.status === 'open' && (
+                          <button onClick={() => handleCloseGig(gig.id)}
+                            className="text-xs px-2 py-1 rounded-lg font-medium transition hover:opacity-80"
+                            style={{ background: 'rgba(253,224,71,0.15)', color: '#FDE047', border: '1px solid rgba(253,224,71,0.35)' }}>
+                            ✕ Fechar
+                          </button>
+                        )}
+                        <button onClick={() => handleDeleteGig(gig.id)} disabled={deletingGigId === gig.id}
+                          className="text-xs px-2 py-1 rounded-lg font-medium transition hover:opacity-80"
+                          style={{ background: 'rgba(229,57,53,0.15)', color: '#f87171', border: '1px solid rgba(229,57,53,0.35)' }}>
+                          {deletingGigId === gig.id ? '...' : '🗑'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-muted"><p>Nenhuma gig encontrada. Seja o primeiro a postar!</p></div>
+              <div className="empty-state py-16">
+                <div className="empty-state-icon">{feedTab === 'minhas' ? '📋' : '🎸'}</div>
+                <p className="text-lg font-semibold mb-2">
+                  {feedTab === 'minhas' ? 'Você ainda não postou gigs' : 'Nenhuma gig encontrada'}
+                </p>
+                <p className="text-muted text-sm mb-5">
+                  {feedTab === 'minhas' ? 'Poste uma oportunidade para músicos' : 'Seja o primeiro a postar!'}
+                </p>
+                <button onClick={() => setShowModal(true)} className="btn btn-primary btn-sm">+ Postar Gig</button>
+              </div>
             )}
           </div>
         </div>

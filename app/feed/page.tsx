@@ -27,6 +27,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true)
   const [tagFilter, setTagFilter] = useState('')
   const [feedTab, setFeedTab] = useState<'todos' | 'seguindo'>('todos')
+  const [sortBy, setSortBy] = useState<'recente' | 'trending'>('recente')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -48,7 +49,7 @@ export default function FeedPage() {
     init()
   }, [])
 
-  useEffect(() => { fetchRiffs() }, [tagFilter, feedTab, followingIds])
+  useEffect(() => { fetchRiffs() }, [tagFilter, feedTab, sortBy, followingIds])
 
   const fetchRiffs = async () => {
     try {
@@ -56,7 +57,6 @@ export default function FeedPage() {
       let query = supabase
         .from('riffs')
         .select('*, user:profiles(*), riff_likes(id, user_id)')
-        .order('created_at', { ascending: false })
 
       if (tagFilter) query = query.contains('tags', [tagFilter])
 
@@ -69,8 +69,14 @@ export default function FeedPage() {
         query = query.in('user_id', followingIds)
       }
 
+      query = query.order('created_at', { ascending: false })
       const { data } = await query
-      setRiffs(data || [])
+
+      let result = data || []
+      if (sortBy === 'trending') {
+        result = [...result].sort((a, b) => (b.riff_likes?.length || 0) - (a.riff_likes?.length || 0))
+      }
+      setRiffs(result)
     } finally {
       setLoading(false)
     }
@@ -150,20 +156,26 @@ export default function FeedPage() {
           </button>
         </div>
 
-        {/* Feed tabs */}
-        <div className="flex items-center gap-1 mb-6 p-1 rounded-xl w-fit" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-          {(['todos', 'seguindo'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setFeedTab(tab)}
-              className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
-              style={{
-                background: feedTab === tab ? 'var(--red)' : 'transparent',
-                color: feedTab === tab ? 'white' : 'var(--muted)',
-              }}>
-              {tab === 'todos' ? '🌐 Todos' : '👥 Seguindo'}
-            </button>
-          ))}
+        {/* Feed tabs + sort */}
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+            {(['todos', 'seguindo'] as const).map(tab => (
+              <button key={tab} onClick={() => setFeedTab(tab)}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: feedTab === tab ? 'var(--red)' : 'transparent', color: feedTab === tab ? 'white' : 'var(--muted)' }}>
+                {tab === 'todos' ? '🌐 Todos' : '👥 Seguindo'}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+            {([['recente', '🕐 Recente'], ['trending', '🔥 Trending']] as const).map(([s, label]) => (
+              <button key={s} onClick={() => setSortBy(s)}
+                className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all"
+                style={{ background: sortBy === s ? 'rgba(253,160,60,0.25)' : 'transparent', color: sortBy === s ? '#FD9A20' : 'var(--muted)' }}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Tag filters */}
