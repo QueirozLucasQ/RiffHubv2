@@ -21,6 +21,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'riffs' | 'projects' | 'gigs'>('riffs')
   const [myProfileId, setMyProfileId] = useState<string | null>(null)
+  const [deletingRiffId, setDeletingRiffId] = useState<string | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
@@ -79,6 +80,16 @@ export default function ProfilePage({ params }: ProfilePageProps) {
     }
     fetchAll()
   }, [params.id])
+
+  const handleDeleteRiff = async (riffId: string) => {
+    setDeletingRiffId(riffId)
+    try {
+      await supabase.from('riff_likes').delete().eq('riff_id', riffId)
+      await supabase.from('riffs').delete().eq('id', riffId)
+      setRiffs(prev => prev.filter(r => r.id !== riffId))
+    } catch (err) { console.error(err) }
+    finally { setDeletingRiffId(null) }
+  }
 
   const handleFollow = async () => {
     if (!myProfileId || followLoading) return
@@ -284,7 +295,16 @@ export default function ProfilePage({ params }: ProfilePageProps) {
               <div className="grid md:grid-cols-2 gap-5">
                 {riffs.map(riff => (
                   <div key={riff.id} className="card">
-                    <h3 className="font-bold mb-1">{riff.title}</h3>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="font-bold leading-tight">{riff.title}</h3>
+                      {isOwner && (
+                        <button onClick={() => handleDeleteRiff(riff.id)} disabled={deletingRiffId === riff.id}
+                          className="text-xs px-2 py-0.5 rounded transition flex-shrink-0 hover:opacity-80"
+                          style={{ color: '#f87171', border: '1px solid rgba(229,57,53,0.3)', background: 'rgba(229,57,53,0.08)' }}>
+                          {deletingRiffId === riff.id ? '...' : '🗑'}
+                        </button>
+                      )}
+                    </div>
                     {riff.description && <p className="text-sm text-muted mb-3 line-clamp-2">{riff.description}</p>}
                     <div className="mb-3"><AudioPlayer src={riff.audio_url} /></div>
                     <div className="flex items-center gap-4 text-xs text-muted">
