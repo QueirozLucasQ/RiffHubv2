@@ -114,7 +114,6 @@ export default async function Home() {
               <Link key={f.href} href={f.href}
                 className="card group flex flex-col gap-4 hover-lift cursor-pointer"
                 style={{ borderColor: 'var(--border)' }}
-                onMouseEnter={() => {}} /* hint for hover */
               >
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
                   style={{ background: f.glow, border: `1px solid ${f.color}22` }}>
