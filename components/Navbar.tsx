@@ -97,8 +97,12 @@ export default function Navbar() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-black text-xl flex-shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="RiffHub" width={32} height={32} style={{ flexShrink: 0 }} />
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <rect width="32" height="32" rx="8" fill="#7B3FE4"/>
+            <path d="M8 6h10a6 6 0 0 1 0 12H8V6z" fill="white" opacity="0.9"/>
+            <path d="M8 18h7l5 8H8v-8z" fill="white" opacity="0.7"/>
+            <path d="M10 12 Q13 9 16 12 Q19 15 22 12" stroke="#E53935" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+          </svg>
           <span>RiffHub</span>
         </Link>
 
