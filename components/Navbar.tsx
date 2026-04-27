@@ -56,10 +56,6 @@ export default function Navbar() {
   const handleSignOut = async () => {
     await supabase.auth.signOut(); setUser(null); setProfile(null); setMenuOpen(false)
   }
-  const handleSignIn = async () => {
-    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : ''
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } })
-  }
   const markNotificationsRead = async () => {
     if (unreadCount > 0 && profile) {
       setUnreadCount(0)
@@ -230,9 +226,9 @@ export default function Navbar() {
                   )}
                 </div>
               ) : (
-                <button onClick={handleSignIn} className="btn btn-primary btn-sm">
+                <Link href="/auth" className="btn btn-primary btn-sm">
                   Entrar
-                </button>
+                </Link>
               )
             )}
           </div>
@@ -267,7 +263,7 @@ export default function Navbar() {
               </>
             )}
             {!loading && !user && (
-              <button onClick={handleSignIn} className="btn btn-primary btn-sm">Entrar</button>
+              <Link href="/auth" className="btn btn-primary btn-sm">Entrar</Link>
             )}
           </div>
         </div>

@@ -238,6 +238,21 @@ select option { background: var(--card); color: var(--white); }
   box-shadow: 0 0 0 3px var(--blue-glow);
 }
 
+/* ==================== AUTH INPUT ==================== */
+.auth-input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: var(--dark);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--white);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.auth-input::placeholder { color: var(--muted); }
+.auth-input:focus { border-color: var(--red); }
+
 /* ==================== MODAL ==================== */
 .modal-overlay {
   position: fixed;
