@@ -76,7 +76,10 @@ export default function AuthPage() {
         },
       })
       if (error) {
-        setError(error.message)
+        if (error.message.includes('rate limit') || error.message.includes('email rate'))
+          setError('Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.')
+        else
+          setError(error.message)
       } else if (data.user?.identities?.length === 0) {
         // Supabase não retorna erro para e-mail duplicado — detecta pelo identities vazio
         setError('Este e-mail já está cadastrado. Se você entrou com Google antes, use o botão "Continuar com Google".')
