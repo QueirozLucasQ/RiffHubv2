@@ -68,7 +68,7 @@ export default function AuthPage() {
     if (regPassword !== regPasswordConfirm) { setError('As senhas não coincidem.'); return }
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: regEmail,
         password: regPassword,
         options: {
@@ -76,8 +76,10 @@ export default function AuthPage() {
         },
       })
       if (error) {
-        if (error.message.includes('already registered')) setError('Este e-mail já está cadastrado.')
-        else setError(error.message)
+        setError(error.message)
+      } else if (data.user?.identities?.length === 0) {
+        // Supabase não retorna erro para e-mail duplicado — detecta pelo identities vazio
+        setError('Este e-mail já está cadastrado. Se você entrou com Google antes, use o botão "Continuar com Google".')
       } else {
         setPendingEmail(regEmail)
         setTab('confirm')
@@ -93,7 +95,7 @@ export default function AuthPage() {
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (code.trim().length < 6) { setError('Digite o código de 6 dígitos.'); return }
+    if (code.trim().length < 6) { setError('Digite o código completo.'); return }
     setLoading(true)
     try {
       const { error } = await supabase.auth.verifyOtp({
@@ -158,7 +160,7 @@ export default function AuthPage() {
                 <div className="text-4xl mb-3">📬</div>
                 <h2 className="text-lg font-bold mb-1">Confirme seu e-mail</h2>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
-                  Enviamos um código de 6 dígitos para<br />
+                  Enviamos um código de confirmação para<br />
                   <span className="font-semibold" style={{ color: 'var(--white)' }}>{pendingEmail}</span>
                 </p>
               </div>
@@ -166,11 +168,11 @@ export default function AuthPage() {
               <div>
                 <input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="000000"
+                  inputMode="text"
+                  maxLength={8}
+                  placeholder="- - - - - - - -"
                   value={code}
-                  onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                  onChange={e => setCode(e.target.value.toUpperCase())}
                   className="w-full text-center text-3xl font-black tracking-[0.5em] py-4 rounded-xl outline-none transition"
                   style={{
                     background: 'var(--dark)',
@@ -195,7 +197,7 @@ export default function AuthPage() {
                 </p>
               )}
 
-              <button type="submit" disabled={loading || code.length < 6}
+              <button type="submit" disabled={loading || code.trim().length < 6}
                 className="btn btn-primary w-full">
                 {loading ? 'Verificando...' : 'Confirmar e entrar'}
               </button>
